@@ -2,9 +2,9 @@
 # Cloud Build Pipeline: apps/service-api
 # ==============================================================================
 # Supports Trunk-Based Deployment & Multi-Project Promotion:
-# - Pull Requests: Runs Unit Tests only (_ACTION=test)
-# - Branch Merge / Push (main) -> Builds, pushes, and deploys to Dev project
-# - Tag push (v*.*.*) -> Builds, pushes, and deploys to Staging/Prod project
+# - Pull Requests: Runs Unit Tests & Builds Container Image (validation only)
+# - Branch Merge / Push (main) -> Tests, builds, pushes, and deploys to Dev project
+# - Tag push (v*.*.*) -> Tests, builds, pushes, and deploys to Staging/Prod project
 # ==============================================================================
 
 steps:
@@ -21,7 +21,7 @@ steps:
         pytest
     dir: 'apps/service-api'
 
-  # 2. Build Container Image
+  # 2. Build Container Image (runs on both PRs and merges to validate container assembly)
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'sh'
     args:
@@ -49,6 +49,9 @@ steps:
           TFVARS_FILE="../../infra/environments/$${ENVIRONMENT}.tfvars"
           if [ -f "$$TFVARS_FILE" ]; then
             TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$TFVARS_FILE" | head -n 1)
+          fi
+          if [ -z "$$TARGET_PROJECT" ]; then
+            TARGET_PROJECT="$PROJECT_ID"
           fi
         fi
 
@@ -79,29 +82,24 @@ steps:
         echo "ENVIRONMENT_SHORT=$$ENVIRONMENT_SHORT" >> .env.app.build
         echo "CURRENT_TAG=$$CURRENT_TAG" >> .env.app.build
 
-        if [ "$$SHOULD_DEPLOY" = "true" ]; then
-          echo "=================================================================="
-          echo "Building container image for project: $$TARGET_PROJECT ($$ENVIRONMENT / $$ENVIRONMENT_SHORT)"
-          echo "=================================================================="
-          TAG_ARGS=""
-          if [ -n "$$CURRENT_TAG" ]; then
-            TAG_ARGS="-t $_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$CURRENT_TAG"
-          fi
-
-          docker build \
-            -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
-            -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT" \
-            -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT_SHORT" \
-            $$TAG_ARGS \
-            .
-        else
-          echo "=================================================================="
-          echo "Skipping container build (test only / PR trigger)"
-          echo "=================================================================="
+        echo "=================================================================="
+        echo "Building container image for project: $$TARGET_PROJECT ($$ENVIRONMENT / $$ENVIRONMENT_SHORT)"
+        echo "Trigger details: BRANCH_NAME='$BRANCH_NAME', TAG_NAME='$TAG_NAME', SHOULD_DEPLOY=$$SHOULD_DEPLOY"
+        echo "=================================================================="
+        TAG_ARGS=""
+        if [ -n "$$CURRENT_TAG" ]; then
+          TAG_ARGS="-t $_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$CURRENT_TAG"
         fi
+
+        docker build \
+          -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
+          -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT" \
+          -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT_SHORT" \
+          $$TAG_ARGS \
+          .
     dir: 'apps/service-api'
 
-  # 3. Push Container Images to Target Artifact Registry
+  # 3. Push Container Images to Target Artifact Registry (only runs on merge to main or tag push)
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'sh'
     args:
@@ -121,12 +119,12 @@ steps:
           fi
         else
           echo "=================================================================="
-          echo "Skipping container push (test only / PR trigger)"
+          echo "Skipping container push (PR trigger / push runs only on merge to main or tag push)"
           echo "=================================================================="
         fi
     dir: 'apps/service-api'
 
-  # 4. Deploy Revision to Target Cloud Run Service
+  # 4. Deploy Revision to Target Cloud Run Service (only runs on merge to main or tag push)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'sh'
     args:
@@ -146,13 +144,13 @@ steps:
             --quiet
         else
           echo "=================================================================="
-          echo "Skipping Cloud Run deployment (test only / PR trigger)"
+          echo "Skipping Cloud Run deployment (PR trigger / deploy runs only on merge to main or tag push)"
           echo "=================================================================="
         fi
     dir: 'apps/service-api'
 
 substitutions:
-  _ACTION: 'auto'               # 'auto' (deploys on main/tags; tests only on PRs), or 'test' / 'deploy'
+  _ACTION: 'auto'               # 'auto' (pushes/deploys on main/tag, builds & tests on PRs), or 'test' / 'deploy'
   _ENVIRONMENT: 'development'   # 'development', 'staging', 'production'
   _TARGET_PROJECT_ID: ''        # Auto-detected from infra/environments/<env>.tfvars if empty
   _REGION: 'us-central1'
