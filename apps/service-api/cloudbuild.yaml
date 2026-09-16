@@ -50,9 +50,6 @@ steps:
           if [ -f "$$TFVARS_FILE" ]; then
             TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$TFVARS_FILE" | head -n 1)
           fi
-          if [ -z "$$TARGET_PROJECT" ]; then
-            TARGET_PROJECT="$PROJECT_ID"
-          fi
         fi
 
         # Check deployment condition
@@ -70,20 +67,32 @@ steps:
           fi
         fi
 
+        if [ "$$SHOULD_DEPLOY" = "true" ] && [ -z "$$TARGET_PROJECT" ]; then
+          echo "ERROR: Unable to resolve TARGET_PROJECT from '$${TFVARS_FILE}' for environment '$${ENVIRONMENT}'!" >&2
+          exit 1
+        fi
+
         # Persist context for subsequent steps
         echo "SHOULD_DEPLOY=$$SHOULD_DEPLOY" > .env.app.build
         echo "TARGET_PROJECT=$$TARGET_PROJECT" >> .env.app.build
         echo "ENVIRONMENT=$$ENVIRONMENT" >> .env.app.build
         echo "ENVIRONMENT_SHORT=$$ENVIRONMENT_SHORT" >> .env.app.build
+        echo "CURRENT_TAG=$$CURRENT_TAG" >> .env.app.build
 
         if [ "$$SHOULD_DEPLOY" = "true" ]; then
           echo "=================================================================="
           echo "Building container image for project: $$TARGET_PROJECT ($$ENVIRONMENT / $$ENVIRONMENT_SHORT)"
           echo "=================================================================="
+          TAG_ARGS=""
+          if [ -n "$$CURRENT_TAG" ]; then
+            TAG_ARGS="-t $_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$CURRENT_TAG"
+          fi
+
           docker build \
             -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
             -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT" \
             -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT_SHORT" \
+            $$TAG_ARGS \
             .
         else
           echo "=================================================================="
@@ -107,6 +116,9 @@ steps:
           docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA"
           docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT"
           docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT_SHORT"
+          if [ -n "$$CURRENT_TAG" ]; then
+            docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$CURRENT_TAG"
+          fi
         else
           echo "=================================================================="
           echo "Skipping container push (test only / PR trigger)"
@@ -130,7 +142,8 @@ steps:
             --image "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
             --region "$_REGION" \
             --project "$$TARGET_PROJECT" \
-            --update-env-vars "ENVIRONMENT=$$ENVIRONMENT,ENVIRONMENT_SHORT=$$ENVIRONMENT_SHORT"
+            --update-env-vars "ENVIRONMENT=$$ENVIRONMENT,ENVIRONMENT_SHORT=$$ENVIRONMENT_SHORT" \
+            --quiet
         else
           echo "=================================================================="
           echo "Skipping Cloud Run deployment (test only / PR trigger)"

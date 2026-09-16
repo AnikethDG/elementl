@@ -20,11 +20,12 @@ wheels/
 .installed.cfg
 *.egg
 
-.env
+.env*
 .venv
 venv/
 ENV/
 
+test_*.py
 .pytest_cache/
 .coverage
 htmlcov/
