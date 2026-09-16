@@ -5,11 +5,12 @@
 # - Pull Request Triggers: Runs 'terraform plan' only (_TF_ACTION=plan)
 # - Branch Merge / Push Triggers: Runs 'terraform apply' (_TF_ACTION=apply)
 #
-# Supported Triggers:
-# - dev-core-apps-plan  (_TF_ACTION=plan,  _ENVIRONMENT=dev,     PR to main)
-# - dev-core-apps-push  (_TF_ACTION=apply, _ENVIRONMENT=dev,     Push to main)
-# - stg-core-apps-push  (_TF_ACTION=apply, _ENVIRONMENT=staging, Tag push)
-# - prd-core-apps-push  (_TF_ACTION=apply, _ENVIRONMENT=prod,    Tag push with approval)
+# State Isolation & Naming Convention:
+# - Shared GCS Bucket: gcs-pid-ec-cmn-app-tfstate-2b36
+# - Prefix Pattern: terraform/app-infra/<env_folder>/<project_id>/infra/state
+#   - dev/development -> development/pid-exc-dev-core-apps-fdzr/...
+#   - staging         -> staging/<staging-project-id>/...
+#   - prod/production -> production/<prod-project-id>/...
 # ==============================================================================
 
 steps:
@@ -23,18 +24,50 @@ steps:
         if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
         if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
 
+        # Determine environment folder (development, staging, production)
+        ENV_FOLDER="$$ENV_NAME"
+        if [ "$$ENV_NAME" = "dev" ] || [ "$$ENV_NAME" = "development" ]; then
+          ENV_FOLDER="development"
+        elif [ "$$ENV_NAME" = "stg" ] || [ "$$ENV_NAME" = "staging" ]; then
+          ENV_FOLDER="staging"
+        elif [ "$$ENV_NAME" = "prd" ] || [ "$$ENV_NAME" = "prod" ] || [ "$$ENV_NAME" = "production" ]; then
+          ENV_FOLDER="production"
+        fi
+
+        ENV_FILE="environments/$${ENV_NAME}.tfvars"
+        if [ ! -f "$$ENV_FILE" ]; then
+          if [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
+            ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
+          fi
+        fi
+
+        # Extract project_id from tfvars if not explicitly provided via substitution
+        TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
+        if [ -z "$$TARGET_PROJECT_ID" ] && [ -f "$$ENV_FILE" ]; then
+          TARGET_PROJECT_ID=$$(grep -E '^\s*project_id\s*=' "$$ENV_FILE" | head -n 1 | sed -E 's/.*=\s*"([^"]+)".*/\1/')
+        fi
+
+        # Determine state prefix
+        STATE_PREFIX="${_STATE_PREFIX}"
+        if [ -z "$$STATE_PREFIX" ]; then
+          if [ -n "$$TARGET_PROJECT_ID" ]; then
+            STATE_PREFIX="terraform/app-infra/$${ENV_FOLDER}/$${TARGET_PROJECT_ID}/infra/state"
+          else
+            STATE_PREFIX="terraform/app-infra/$${ENV_FOLDER}/infra/state"
+          fi
+        fi
+
+        STATE_BUCKET="${_STATE_BUCKET:-gcs-pid-ec-cmn-app-tfstate-2b36}"
+
         echo "=================================================================="
-        echo "Initializing Terraform for environment: $$ENV_NAME"
+        echo "Initializing Terraform for environment: $$ENV_NAME ($$ENV_FOLDER)"
+        echo "Backend Bucket: $$STATE_BUCKET"
+        echo "State Prefix:   $$STATE_PREFIX"
         echo "=================================================================="
 
-        if [ -n "${_STATE_BUCKET}" ]; then
-          terraform init \
-            -backend-config="prefix=terraform/infra/$$ENV_NAME/state" \
-            -backend-config="bucket=${_STATE_BUCKET}"
-        else
-          terraform init \
-            -backend-config="prefix=terraform/infra/$$ENV_NAME/state"
-        fi
+        terraform init \
+          -backend-config="bucket=$$STATE_BUCKET" \
+          -backend-config="prefix=$$STATE_PREFIX"
     dir: 'infra'
 
   # 2. Terraform Plan
@@ -111,8 +144,10 @@ steps:
 substitutions:
   _TF_ACTION: 'plan'   # 'plan' (PR triggers / validation) or 'apply' (branch merge / push)
   _ENVIRONMENT: 'dev'  # 'dev', 'staging'/'stg', 'prod'/'prd'
+  _TARGET_PROJECT_ID: '' # Optional override; auto-detected from environments/<env>.tfvars if empty
+  _STATE_PREFIX: ''    # Optional override; defaults to terraform/app-infra/<env_folder>/<project_id>/infra/state
+  _STATE_BUCKET: 'gcs-pid-ec-cmn-app-tfstate-2b36' # Shared state bucket for all environments of nse-core-apps
   _REGION: 'us-central1'
-  _STATE_BUCKET: ''   # Optional override; defaults to bucket in backend.tf if empty
 
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -342,8 +342,8 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
    ```hcl
    terraform {
      backend "gcs" {
-       bucket = "p-nsedusc1-core-app-fe-01-irzf-tfstate" # Update if your bucket name differs
-       prefix = "terraform/state"
+       bucket = "gcs-pid-ec-cmn-app-tfstate-2b36"
+       prefix = "terraform/app-infra/development/pid-exc-dev-core-apps-fdzr/infra/state"
      }
    }
    ```

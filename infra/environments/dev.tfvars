@@ -1,7 +1,7 @@
 # ==============================================================================
 # Development Environment Configuration (Dev GCP Project)
 # ==============================================================================
-project_id         = "p-nsedusc1-core-app-fe-01-irzf" # Dev GCP Project ID
+project_id         = "pid-exc-dev-core-apps-fdzr" # Dev GCP Project ID
 region             = "us-central1"
 environment        = "dev"
 artifact_repo_name = "app-repo"
