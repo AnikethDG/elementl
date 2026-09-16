@@ -10,9 +10,9 @@ variable "region" {
 }
 
 variable "environment" {
-  description = "The target deployment environment (e.g., dev, staging, prod)"
+  description = "The target deployment environment (development, staging, production)"
   type        = string
-  default     = "dev"
+  default     = "development"
 }
 
 variable "artifact_repo_name" {

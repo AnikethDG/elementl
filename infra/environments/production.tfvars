@@ -4,7 +4,7 @@
 # Update with your dedicated Production GCP Project ID
 project_id         = "pid-nse-prd-core-apps-6aw8"
 region             = "us-central1"
-environment        = "prd"
+environment        = "production"
 artifact_repo_name = "app-repo"
 
 services = {
@@ -19,8 +19,9 @@ services = {
     allow_unauth       = true
     ingress            = "INGRESS_TRAFFIC_ALL"
     env_vars = {
-      ENVIRONMENT = "production"
-      LOG_LEVEL   = "warn"
+      ENVIRONMENT       = "production"
+      ENVIRONMENT_SHORT = "prd"
+      LOG_LEVEL         = "warn"
     }
   }
 }

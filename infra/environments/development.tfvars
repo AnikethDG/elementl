@@ -3,7 +3,7 @@
 # ==============================================================================
 project_id         = "pid-nse-dev-core-apps-dz09" # Dev GCP Project ID
 region             = "us-central1"
-environment        = "dev"
+environment        = "development"
 artifact_repo_name = "app-repo"
 
 services = {
@@ -18,8 +18,9 @@ services = {
     allow_unauth       = true
     ingress            = "INGRESS_TRAFFIC_ALL"
     env_vars = {
-      ENVIRONMENT = "dev"
-      LOG_LEVEL   = "debug"
+      ENVIRONMENT       = "development"
+      ENVIRONMENT_SHORT = "dev"
+      LOG_LEVEL         = "debug"
     }
   }
 }
