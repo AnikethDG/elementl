@@ -13,27 +13,41 @@ steps:
       - '-c'
       - |
         ENV_NAME="${_ENVIRONMENT}"
-        if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
-        if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
-
-        ENV_FOLDER="$$ENV_NAME"
-        if [ "$$ENV_NAME" = "dev" ] || [ "$$ENV_NAME" = "development" ]; then
-          ENV_FOLDER="development"
-        elif [ "$$ENV_NAME" = "stg" ] || [ "$$ENV_NAME" = "staging" ]; then
-          ENV_FOLDER="staging"
-        elif [ "$$ENV_NAME" = "prd" ] || [ "$$ENV_NAME" = "prod" ] || [ "$$ENV_NAME" = "production" ]; then
-          ENV_FOLDER="production"
-        fi
+        case "$$ENV_NAME" in
+          stg|staging)
+            ENV_NAME="staging"
+            ENV_FOLDER="staging"
+            ;;
+          prd|prod|production)
+            ENV_NAME="prod"
+            ENV_FOLDER="production"
+            ;;
+          dev|development|*)
+            ENV_NAME="dev"
+            ENV_FOLDER="development"
+            ;;
+        esac
 
         ENV_FILE="environments/$${ENV_NAME}.tfvars"
-        if [ ! -f "$$ENV_FILE" ] && [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
-          ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
+        if [ ! -f "$$ENV_FILE" ]; then
+          if [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
+            ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
+          elif [ -f "environments/production.tfvars" ]; then
+            ENV_FILE="environments/production.tfvars"
+          elif [ -f "environments/prod.tfvars" ]; then
+            ENV_FILE="environments/prod.tfvars"
+          fi
         fi
 
         # Extract project_id from tfvars
         TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
         if [ -z "$$TARGET_PROJECT_ID" ] && [ -f "$$ENV_FILE" ]; then
           TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$ENV_FILE" | head -n 1)
+        fi
+
+        if [ -z "$$TARGET_PROJECT_ID" ]; then
+          echo "ERROR: Unable to resolve TARGET_PROJECT_ID from '$$ENV_FILE' (file exists: $$(test -f "$$ENV_FILE" && echo yes || echo no)) for environment '${_ENVIRONMENT}'!" >&2
+          exit 1
         fi
 
         STATE_BUCKET="${_STATE_BUCKET:-gcs-$${TARGET_PROJECT_ID}-tfstate}"
@@ -43,6 +57,7 @@ steps:
         echo "ENV_NAME=$$ENV_NAME" > .env.build
         echo "ENV_FILE=$$ENV_FILE" >> .env.build
         echo "TARGET_PROJECT_ID=$$TARGET_PROJECT_ID" >> .env.build
+
 
         echo "=================================================================="
         echo "Initializing Terraform for: $$ENV_NAME ($$ENV_FOLDER)"

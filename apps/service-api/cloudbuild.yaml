@@ -28,8 +28,17 @@ steps:
       - '-c'
       - |
         ENV_NAME="${_ENVIRONMENT}"
-        if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
-        if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
+        case "$$ENV_NAME" in
+          stg|staging)
+            ENV_NAME="staging"
+            ;;
+          prd|prod|production)
+            ENV_NAME="prod"
+            ;;
+          dev|development|*)
+            ENV_NAME="dev"
+            ;;
+        esac
 
         # Auto-detect target project from tfvars if not supplied
         TARGET_PROJECT="${_TARGET_PROJECT_ID}"
@@ -58,6 +67,11 @@ steps:
           fi
         fi
 
+        # Persist context for subsequent steps
+        echo "SHOULD_DEPLOY=$$SHOULD_DEPLOY" > .env.app.build
+        echo "TARGET_PROJECT=$$TARGET_PROJECT" >> .env.app.build
+        echo "ENV_NAME=$$ENV_NAME" >> .env.app.build
+
         if [ "$$SHOULD_DEPLOY" = "true" ]; then
           echo "=================================================================="
           echo "Building container image for project: $$TARGET_PROJECT (env: $$ENV_NAME)"
@@ -79,34 +93,7 @@ steps:
     args:
       - '-c'
       - |
-        ENV_NAME="${_ENVIRONMENT}"
-        if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
-        if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
-
-        TARGET_PROJECT="${_TARGET_PROJECT_ID}"
-        if [ -z "$$TARGET_PROJECT" ]; then
-          TFVARS_FILE="../../infra/environments/$${ENV_NAME}.tfvars"
-          if [ -f "$$TFVARS_FILE" ]; then
-            TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$TFVARS_FILE" | head -n 1)
-          fi
-          if [ -z "$$TARGET_PROJECT" ]; then
-            TARGET_PROJECT="$PROJECT_ID"
-          fi
-        fi
-
-        CURRENT_BRANCH="$BRANCH_NAME"
-        CURRENT_TAG="$TAG_NAME"
-
-        SHOULD_DEPLOY=false
-        if [ "${_ACTION}" = "deploy" ]; then
-          SHOULD_DEPLOY=true
-        elif [ "${_ACTION}" = "test" ]; then
-          SHOULD_DEPLOY=false
-        elif [ "${_ACTION}" = "auto" ] || [ -z "${_ACTION}" ]; then
-          if [ "$$CURRENT_BRANCH" = "main" ] || [ -n "$$CURRENT_TAG" ]; then
-            SHOULD_DEPLOY=true
-          fi
-        fi
+        if [ -f .env.app.build ]; then . ./.env.app.build; fi
 
         if [ "$$SHOULD_DEPLOY" = "true" ]; then
           echo "=================================================================="
@@ -127,34 +114,7 @@ steps:
     args:
       - '-c'
       - |
-        ENV_NAME="${_ENVIRONMENT}"
-        if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
-        if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
-
-        TARGET_PROJECT="${_TARGET_PROJECT_ID}"
-        if [ -z "$$TARGET_PROJECT" ]; then
-          TFVARS_FILE="../../infra/environments/$${ENV_NAME}.tfvars"
-          if [ -f "$$TFVARS_FILE" ]; then
-            TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$TFVARS_FILE" | head -n 1)
-          fi
-          if [ -z "$$TARGET_PROJECT" ]; then
-            TARGET_PROJECT="$PROJECT_ID"
-          fi
-        fi
-
-        CURRENT_BRANCH="$BRANCH_NAME"
-        CURRENT_TAG="$TAG_NAME"
-
-        SHOULD_DEPLOY=false
-        if [ "${_ACTION}" = "deploy" ]; then
-          SHOULD_DEPLOY=true
-        elif [ "${_ACTION}" = "test" ]; then
-          SHOULD_DEPLOY=false
-        elif [ "${_ACTION}" = "auto" ] || [ -z "${_ACTION}" ]; then
-          if [ "$$CURRENT_BRANCH" = "main" ] || [ -n "$$CURRENT_TAG" ]; then
-            SHOULD_DEPLOY=true
-          fi
-        fi
+        if [ -f .env.app.build ]; then . ./.env.app.build; fi
 
         if [ "$$SHOULD_DEPLOY" = "true" ]; then
           echo "=================================================================="
