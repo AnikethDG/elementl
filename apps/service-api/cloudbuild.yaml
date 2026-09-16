@@ -27,23 +27,26 @@ steps:
     args:
       - '-c'
       - |
-        ENV_NAME="${_ENVIRONMENT}"
-        case "$$ENV_NAME" in
+        RAW_ENV="${_ENVIRONMENT}"
+        case "$$RAW_ENV" in
           stg|staging)
-            ENV_NAME="staging"
+            ENVIRONMENT="staging"
+            ENVIRONMENT_SHORT="stg"
             ;;
           prd|prod|production)
-            ENV_NAME="prod"
+            ENVIRONMENT="production"
+            ENVIRONMENT_SHORT="prd"
             ;;
           dev|development|*)
-            ENV_NAME="dev"
+            ENVIRONMENT="development"
+            ENVIRONMENT_SHORT="dev"
             ;;
         esac
 
         # Auto-detect target project from tfvars if not supplied
         TARGET_PROJECT="${_TARGET_PROJECT_ID}"
         if [ -z "$$TARGET_PROJECT" ]; then
-          TFVARS_FILE="../../infra/environments/$${ENV_NAME}.tfvars"
+          TFVARS_FILE="../../infra/environments/$${ENVIRONMENT}.tfvars"
           if [ -f "$$TFVARS_FILE" ]; then
             TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$TFVARS_FILE" | head -n 1)
           fi
@@ -70,15 +73,17 @@ steps:
         # Persist context for subsequent steps
         echo "SHOULD_DEPLOY=$$SHOULD_DEPLOY" > .env.app.build
         echo "TARGET_PROJECT=$$TARGET_PROJECT" >> .env.app.build
-        echo "ENV_NAME=$$ENV_NAME" >> .env.app.build
+        echo "ENVIRONMENT=$$ENVIRONMENT" >> .env.app.build
+        echo "ENVIRONMENT_SHORT=$$ENVIRONMENT_SHORT" >> .env.app.build
 
         if [ "$$SHOULD_DEPLOY" = "true" ]; then
           echo "=================================================================="
-          echo "Building container image for project: $$TARGET_PROJECT (env: $$ENV_NAME)"
+          echo "Building container image for project: $$TARGET_PROJECT ($$ENVIRONMENT / $$ENVIRONMENT_SHORT)"
           echo "=================================================================="
           docker build \
             -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
-            -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENV_NAME" \
+            -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT" \
+            -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT_SHORT" \
             .
         else
           echo "=================================================================="
@@ -100,7 +105,8 @@ steps:
           echo "Pushing images to Artifact Registry in project: $$TARGET_PROJECT"
           echo "=================================================================="
           docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA"
-          docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENV_NAME"
+          docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT"
+          docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENVIRONMENT_SHORT"
         else
           echo "=================================================================="
           echo "Skipping container push (test only / PR trigger)"
@@ -118,13 +124,13 @@ steps:
 
         if [ "$$SHOULD_DEPLOY" = "true" ]; then
           echo "=================================================================="
-          echo "Deploying Cloud Run service to project: $$TARGET_PROJECT"
+          echo "Deploying Cloud Run service to project: $$TARGET_PROJECT ($$ENVIRONMENT / $$ENVIRONMENT_SHORT)"
           echo "=================================================================="
           gcloud run deploy "$_SERVICE_NAME" \
             --image "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
             --region "$_REGION" \
             --project "$$TARGET_PROJECT" \
-            --update-env-vars "ENVIRONMENT=$$ENV_NAME"
+            --update-env-vars "ENVIRONMENT=$$ENVIRONMENT,ENVIRONMENT_SHORT=$$ENVIRONMENT_SHORT"
         else
           echo "=================================================================="
           echo "Skipping Cloud Run deployment (test only / PR trigger)"
@@ -133,9 +139,9 @@ steps:
     dir: 'apps/service-api'
 
 substitutions:
-  _ACTION: 'auto'        # 'auto' (deploys on main/tags; tests only on PRs), or 'test' / 'deploy'
-  _ENVIRONMENT: 'dev'    # 'dev', 'staging'/'stg', 'prod'/'prd'
-  _TARGET_PROJECT_ID: '' # Auto-detected from infra/environments/<env>.tfvars if empty
+  _ACTION: 'auto'               # 'auto' (deploys on main/tags; tests only on PRs), or 'test' / 'deploy'
+  _ENVIRONMENT: 'development'   # 'development', 'staging', 'production'
+  _TARGET_PROJECT_ID: ''        # Auto-detected from infra/environments/<env>.tfvars if empty
   _REGION: 'us-central1'
   _ARTIFACT_REPO: 'app-repo'
   _SERVICE_NAME: 'service-api'

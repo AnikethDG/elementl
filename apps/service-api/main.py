@@ -52,7 +52,8 @@ def root() -> Dict[str, str]:
     return {
         "message": f"Hello from {service_name}!",
         "revision": revision,
-        "environment": os.getenv("ENVIRONMENT", "development")
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "environment_short": os.getenv("ENVIRONMENT_SHORT", "dev")
     }
 
 

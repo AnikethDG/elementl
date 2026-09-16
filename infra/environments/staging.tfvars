@@ -4,7 +4,7 @@
 # Update with your dedicated Staging GCP Project ID
 project_id         = "pid-nse-stg-core-apps-k8ti"
 region             = "us-central1"
-environment        = "stg"
+environment        = "staging"
 artifact_repo_name = "app-repo"
 
 services = {
@@ -19,8 +19,9 @@ services = {
     allow_unauth       = true
     ingress            = "INGRESS_TRAFFIC_ALL"
     env_vars = {
-      ENVIRONMENT = "staging"
-      LOG_LEVEL   = "info"
+      ENVIRONMENT       = "staging"
+      ENVIRONMENT_SHORT = "stg"
+      LOG_LEVEL         = "info"
     }
   }
 }
