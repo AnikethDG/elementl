@@ -1,0 +1,60 @@
+# ==============================================================================
+# Cloud Build Pipeline: Infrastructure (Terraform)
+# ==============================================================================
+# This pipeline runs when changes are pushed to `infra/**`.
+# It executes Terraform to provision shared core resources, Artifact Registry,
+# service accounts, and Cloud Run service shells for the specified environment.
+# Multi-Project Architecture:
+# - Each environment (dev, staging, prod) has its own dedicated GCP project
+#   defined in `environments/${_ENVIRONMENT}.tfvars`.
+# - State is isolated via GCS prefix: `terraform/infra/${_ENVIRONMENT}/state`.
+# ==============================================================================
+
+steps:
+  # 1. Terraform Init (connecting to GCS remote backend with environment-isolated prefix)
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        if [ -n "${_STATE_BUCKET}" ]; then
+          terraform init \
+            -backend-config="prefix=terraform/infra/${_ENVIRONMENT}/state" \
+            -backend-config="bucket=${_STATE_BUCKET}"
+        else
+          terraform init \
+            -backend-config="prefix=terraform/infra/${_ENVIRONMENT}/state"
+        fi
+    dir: 'infra'
+
+  # 2. Terraform Plan
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        terraform plan \
+          -var-file="environments/${_ENVIRONMENT}.tfvars" \
+          -var="region=$_REGION" \
+          -var="environment=$_ENVIRONMENT"
+    dir: 'infra'
+
+  # 3. Terraform Apply
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        terraform apply -auto-approve \
+          -var-file="environments/${_ENVIRONMENT}.tfvars" \
+          -var="region=$_REGION" \
+          -var="environment=$_ENVIRONMENT"
+    dir: 'infra'
+
+substitutions:
+  _ENVIRONMENT: 'dev'
+  _REGION: 'us-central1'
+  _STATE_BUCKET: '' # Optional override; defaults to bucket in backend.tf if empty
+
+options:
+  logging: CLOUD_LOGGING_ONLY
