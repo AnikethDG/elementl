@@ -2,23 +2,26 @@
 # Cloud Build Pipeline: apps/service-api
 # ==============================================================================
 # Supports Trunk-Based Deployment & Multi-Project Promotion:
-# - Each environment (dev, staging, prod) runs in its own GCP project.
-# - Push to `main` -> Deploys to Dev project
-# - Tag push (`v*.*.*`) -> Deploys to Staging project & triggers approval for Prod project
+# - Pull Requests: Runs Unit Tests only (_ACTION=test)
+# - Branch Merge / Push (main) -> Builds, pushes, and deploys to Dev project
+# - Tag push (v*.*.*) -> Builds, pushes, and deploys to Staging/Prod project
 # ==============================================================================
 
 steps:
-  # 1. Run Unit Tests
+  # 1. Run Unit Tests (always runs on PRs and merges)
   - name: 'python:3.11-slim'
     entrypoint: 'sh'
     args:
       - '-c'
       - |
+        echo "=================================================================="
+        echo "Running Unit Tests for apps/service-api"
+        echo "=================================================================="
         pip install --no-cache-dir -r requirements.txt
         pytest
     dir: 'apps/service-api'
 
-  # 2. Build Container Image (Build once with immutable commit SHA)
+  # 2. Build Container Image
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'sh'
     args:
@@ -28,12 +31,46 @@ steps:
         if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
         if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
 
-        TARGET_PROJECT="${_TARGET_PROJECT_ID:-$PROJECT_ID}"
-        echo "Building image for project: $$TARGET_PROJECT (env: $$ENV_NAME)"
-        docker build \
-          -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
-          -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENV_NAME" \
-          .
+        # Auto-detect target project from tfvars if not supplied
+        TARGET_PROJECT="${_TARGET_PROJECT_ID}"
+        if [ -z "$$TARGET_PROJECT" ]; then
+          TFVARS_FILE="../../infra/environments/$${ENV_NAME}.tfvars"
+          if [ -f "$$TFVARS_FILE" ]; then
+            TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$TFVARS_FILE" | head -n 1)
+          fi
+          if [ -z "$$TARGET_PROJECT" ]; then
+            TARGET_PROJECT="$PROJECT_ID"
+          fi
+        fi
+
+        # Check deployment condition
+        CURRENT_BRANCH="$BRANCH_NAME"
+        CURRENT_TAG="$TAG_NAME"
+
+        SHOULD_DEPLOY=false
+        if [ "${_ACTION}" = "deploy" ]; then
+          SHOULD_DEPLOY=true
+        elif [ "${_ACTION}" = "test" ]; then
+          SHOULD_DEPLOY=false
+        elif [ "${_ACTION}" = "auto" ] || [ -z "${_ACTION}" ]; then
+          if [ "$$CURRENT_BRANCH" = "main" ] || [ -n "$$CURRENT_TAG" ]; then
+            SHOULD_DEPLOY=true
+          fi
+        fi
+
+        if [ "$$SHOULD_DEPLOY" = "true" ]; then
+          echo "=================================================================="
+          echo "Building container image for project: $$TARGET_PROJECT (env: $$ENV_NAME)"
+          echo "=================================================================="
+          docker build \
+            -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
+            -t "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENV_NAME" \
+            .
+        else
+          echo "=================================================================="
+          echo "Skipping container build (test only / PR trigger)"
+          echo "=================================================================="
+        fi
     dir: 'apps/service-api'
 
   # 3. Push Container Images to Target Artifact Registry
@@ -46,10 +83,42 @@ steps:
         if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
         if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
 
-        TARGET_PROJECT="${_TARGET_PROJECT_ID:-$PROJECT_ID}"
-        echo "Pushing image to project: $$TARGET_PROJECT"
-        docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA"
-        docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENV_NAME"
+        TARGET_PROJECT="${_TARGET_PROJECT_ID}"
+        if [ -z "$$TARGET_PROJECT" ]; then
+          TFVARS_FILE="../../infra/environments/$${ENV_NAME}.tfvars"
+          if [ -f "$$TFVARS_FILE" ]; then
+            TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$TFVARS_FILE" | head -n 1)
+          fi
+          if [ -z "$$TARGET_PROJECT" ]; then
+            TARGET_PROJECT="$PROJECT_ID"
+          fi
+        fi
+
+        CURRENT_BRANCH="$BRANCH_NAME"
+        CURRENT_TAG="$TAG_NAME"
+
+        SHOULD_DEPLOY=false
+        if [ "${_ACTION}" = "deploy" ]; then
+          SHOULD_DEPLOY=true
+        elif [ "${_ACTION}" = "test" ]; then
+          SHOULD_DEPLOY=false
+        elif [ "${_ACTION}" = "auto" ] || [ -z "${_ACTION}" ]; then
+          if [ "$$CURRENT_BRANCH" = "main" ] || [ -n "$$CURRENT_TAG" ]; then
+            SHOULD_DEPLOY=true
+          fi
+        fi
+
+        if [ "$$SHOULD_DEPLOY" = "true" ]; then
+          echo "=================================================================="
+          echo "Pushing images to Artifact Registry in project: $$TARGET_PROJECT"
+          echo "=================================================================="
+          docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA"
+          docker push "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$$ENV_NAME"
+        else
+          echo "=================================================================="
+          echo "Skipping container push (test only / PR trigger)"
+          echo "=================================================================="
+        fi
     dir: 'apps/service-api'
 
   # 4. Deploy Revision to Target Cloud Run Service
@@ -62,21 +131,55 @@ steps:
         if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
         if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
 
-        TARGET_PROJECT="${_TARGET_PROJECT_ID:-$PROJECT_ID}"
-        echo "Deploying Cloud Run service to project: $$TARGET_PROJECT"
-        gcloud run deploy "$_SERVICE_NAME" \
-          --image "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
-          --region "$_REGION" \
-          --project "$$TARGET_PROJECT" \
-          --update-env-vars "ENVIRONMENT=$$ENV_NAME"
+        TARGET_PROJECT="${_TARGET_PROJECT_ID}"
+        if [ -z "$$TARGET_PROJECT" ]; then
+          TFVARS_FILE="../../infra/environments/$${ENV_NAME}.tfvars"
+          if [ -f "$$TFVARS_FILE" ]; then
+            TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$TFVARS_FILE" | head -n 1)
+          fi
+          if [ -z "$$TARGET_PROJECT" ]; then
+            TARGET_PROJECT="$PROJECT_ID"
+          fi
+        fi
+
+        CURRENT_BRANCH="$BRANCH_NAME"
+        CURRENT_TAG="$TAG_NAME"
+
+        SHOULD_DEPLOY=false
+        if [ "${_ACTION}" = "deploy" ]; then
+          SHOULD_DEPLOY=true
+        elif [ "${_ACTION}" = "test" ]; then
+          SHOULD_DEPLOY=false
+        elif [ "${_ACTION}" = "auto" ] || [ -z "${_ACTION}" ]; then
+          if [ "$$CURRENT_BRANCH" = "main" ] || [ -n "$$CURRENT_TAG" ]; then
+            SHOULD_DEPLOY=true
+          fi
+        fi
+
+        if [ "$$SHOULD_DEPLOY" = "true" ]; then
+          echo "=================================================================="
+          echo "Deploying Cloud Run service to project: $$TARGET_PROJECT"
+          echo "=================================================================="
+          gcloud run deploy "$_SERVICE_NAME" \
+            --image "$_REGION-docker.pkg.dev/$$TARGET_PROJECT/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA" \
+            --region "$_REGION" \
+            --project "$$TARGET_PROJECT" \
+            --update-env-vars "ENVIRONMENT=$$ENV_NAME"
+        else
+          echo "=================================================================="
+          echo "Skipping Cloud Run deployment (test only / PR trigger)"
+          echo "=================================================================="
+        fi
     dir: 'apps/service-api'
 
 substitutions:
-  _ENVIRONMENT: 'dev'
-  _TARGET_PROJECT_ID: '' # If empty, defaults to $PROJECT_ID at runtime
+  _ACTION: 'auto'        # 'auto' (deploys on main/tags; tests only on PRs), or 'test' / 'deploy'
+  _ENVIRONMENT: 'dev'    # 'dev', 'staging'/'stg', 'prod'/'prd'
+  _TARGET_PROJECT_ID: '' # Auto-detected from infra/environments/<env>.tfvars if empty
   _REGION: 'us-central1'
   _ARTIFACT_REPO: 'app-repo'
   _SERVICE_NAME: 'service-api'
 
 options:
   logging: CLOUD_LOGGING_ONLY
+
