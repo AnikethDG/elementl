@@ -21,7 +21,7 @@ services = {
     env_vars = {
       ENVIRONMENT       = "staging"
       ENVIRONMENT_SHORT = "stg"
-      LOG_LEVEL         = "info"
+      LOG_LEVEL         = "INFO"
     }
   }
 }

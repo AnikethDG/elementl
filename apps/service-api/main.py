@@ -4,9 +4,14 @@ from typing import Dict
 from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
-# Configure structured logging
+# Configure structured logging safely (handling lower-case and 'warn' variants)
+raw_log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+if raw_log_level == "WARN":
+    raw_log_level = "WARNING"
+log_level = getattr(logging, raw_log_level, logging.INFO)
+
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
+    level=log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("service-api")
