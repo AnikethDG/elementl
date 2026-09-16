@@ -20,7 +20,7 @@ services = {
     env_vars = {
       ENVIRONMENT       = "development"
       ENVIRONMENT_SHORT = "dev"
-      LOG_LEVEL         = "debug"
+      LOG_LEVEL         = "DEBUG"
     }
   }
 }

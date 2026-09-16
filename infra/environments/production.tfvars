@@ -21,7 +21,7 @@ services = {
     env_vars = {
       ENVIRONMENT       = "production"
       ENVIRONMENT_SHORT = "prd"
-      LOG_LEVEL         = "warn"
+      LOG_LEVEL         = "WARNING"
     }
   }
 }
