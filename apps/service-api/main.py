@@ -50,7 +50,7 @@ def root() -> Dict[str, str]:
     service_name = os.getenv("K_SERVICE", "service-api")
     revision = os.getenv("K_REVISION", "local")
     return {
-        "message": f"Hello from {service_name}!",
+        "message": f"Hello! from {service_name}!",
         "revision": revision,
         "environment": os.getenv("ENVIRONMENT", "development"),
         "environment_short": os.getenv("ENVIRONMENT_SHORT", "dev")

@@ -28,7 +28,8 @@ variable "enable_apis" {
     "run.googleapis.com",
     "artifactregistry.googleapis.com",
     "cloudbuild.googleapis.com",
-    "iam.googleapis.com"
+    "iam.googleapis.com",
+    "serviceusage.googleapis.com"
   ]
 }
 
