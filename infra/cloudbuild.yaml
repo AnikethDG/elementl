@@ -3,7 +3,7 @@
 # ==============================================================================
 # This pipeline manages infrastructure provisioning via Terraform:
 # - Pull Request Triggers: Runs 'terraform plan' only (_TF_ACTION=plan)
-# - Branch Merge / Push Triggers: Runs 'terraform apply' (_TF_ACTION=apply)
+# - Branch Merge / Push Triggers: Runs 'terraform apply' (_TF_ACTION=apply or auto on main)
 #
 # State Isolation & Naming Convention:
 # - Shared GCS Bucket: gcs-pid-ns-cmn-app-tfstate-iv0b
@@ -41,10 +41,10 @@ steps:
           fi
         fi
 
-        # Extract project_id from tfvars if not explicitly provided via substitution
+        # Extract project_id reliably from tfvars if not explicitly provided via substitution
         TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
         if [ -z "$$TARGET_PROJECT_ID" ] && [ -f "$$ENV_FILE" ]; then
-          TARGET_PROJECT_ID=$$(grep -E '^\s*project_id\s*=' "$$ENV_FILE" | head -n 1 | sed -E 's/.*=\s*"([^"]+)".*/\1/')
+          TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$ENV_FILE" | head -n 1)
         fi
 
         # Determine state prefix
@@ -63,6 +63,7 @@ steps:
         echo "Initializing Terraform for environment: $$ENV_NAME ($$ENV_FOLDER)"
         echo "Backend Bucket: $$STATE_BUCKET"
         echo "State Prefix:   $$STATE_PREFIX"
+        echo "Project ID:     $$TARGET_PROJECT_ID"
         echo "=================================================================="
 
         terraform init \
@@ -98,51 +99,73 @@ steps:
         echo "=================================================================="
 
         terraform plan \
+          -out=tfplan \
           -var-file="$$ENV_FILE" \
           -var="region=$_REGION" \
           -var="environment=$$ENV_NAME"
     dir: 'infra'
 
-  # 3. Terraform Apply (only executed when _TF_ACTION is "apply")
+  # 3. Terraform Apply (executed on main merge, tag push, or when _TF_ACTION=apply)
   - name: 'hashicorp/terraform:1.5'
     entrypoint: 'sh'
     args:
       - '-c'
       - |
-        if [ "${_TF_ACTION}" = "apply" ]; then
-          ENV_NAME="${_ENVIRONMENT}"
-          if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
-          if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
+        ENV_NAME="${_ENVIRONMENT}"
+        if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
+        if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
 
-          ENV_FILE="environments/$${ENV_NAME}.tfvars"
-          if [ ! -f "$$ENV_FILE" ]; then
-            if [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
-              ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
-            else
-              echo "ERROR: Environment tfvars file '$$ENV_FILE' not found for _ENVIRONMENT='${_ENVIRONMENT}'!" >&2
-              exit 1
-            fi
+        ENV_FILE="environments/$${ENV_NAME}.tfvars"
+        if [ ! -f "$$ENV_FILE" ]; then
+          if [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
+            ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
           fi
+        fi
 
+        # Determine whether to apply:
+        # 1. Explicitly set to 'apply'
+        # 2. 'auto' (default) on main branch push or tag push
+        CURRENT_BRANCH="$BRANCH_NAME"
+        CURRENT_TAG="$TAG_NAME"
+
+        SHOULD_APPLY=false
+        if [ "${_TF_ACTION}" = "apply" ]; then
+          SHOULD_APPLY=true
+        elif [ "${_TF_ACTION}" = "plan" ]; then
+          SHOULD_APPLY=false
+        elif [ "${_TF_ACTION}" = "auto" ] || [ -z "${_TF_ACTION}" ]; then
+          if [ "$$CURRENT_BRANCH" = "main" ] || [ -n "$$CURRENT_TAG" ]; then
+            SHOULD_APPLY=true
+          fi
+        fi
+
+        if [ "$$SHOULD_APPLY" = "true" ]; then
           echo "=================================================================="
           echo "Applying Terraform changes for environment: $$ENV_NAME"
-          echo "Using var-file: $$ENV_FILE"
+          echo "Trigger source: BRANCH_NAME='$$CURRENT_BRANCH', TAG_NAME='$$CURRENT_TAG', _TF_ACTION='${_TF_ACTION}'"
           echo "=================================================================="
 
-          terraform apply -auto-approve \
-            -var-file="$$ENV_FILE" \
-            -var="region=$_REGION" \
-            -var="environment=$$ENV_NAME"
+          if [ -f tfplan ]; then
+            echo "Applying pre-computed plan file: tfplan"
+            terraform apply -auto-approve tfplan
+          else
+            echo "Applying with var-file: $$ENV_FILE"
+            terraform apply -auto-approve \
+              -var-file="$$ENV_FILE" \
+              -var="region=$_REGION" \
+              -var="environment=$$ENV_NAME"
+          fi
         else
           echo "=================================================================="
-          echo "Skipping terraform apply: _TF_ACTION is set to '${_TF_ACTION}'"
-          echo "(Terraform apply only executes when _TF_ACTION is 'apply')"
+          echo "Skipping terraform apply (planning only)"
+          echo "Trigger source: BRANCH_NAME='$$CURRENT_BRANCH', TAG_NAME='$$CURRENT_TAG', _TF_ACTION='${_TF_ACTION}'"
+          echo "(Terraform apply executes on main merge, tag push, or when _TF_ACTION='apply')"
           echo "=================================================================="
         fi
     dir: 'infra'
 
 substitutions:
-  _TF_ACTION: 'plan'   # 'plan' (PR triggers / validation) or 'apply' (branch merge / push)
+  _TF_ACTION: 'auto'   # 'auto' (applies on main merge / tag push; plans on PRs), or explicitly 'plan' / 'apply'
   _ENVIRONMENT: 'dev'  # 'dev', 'staging'/'stg', 'prod'/'prd'
   _TARGET_PROJECT_ID: '' # Optional override; auto-detected from environments/<env>.tfvars if empty
   _STATE_PREFIX: ''    # Optional override; defaults to terraform/app-infra/<env_folder>/<project_id>/infra/state
