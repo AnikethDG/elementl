@@ -2,9 +2,9 @@
 # Staging Environment Configuration (Staging GCP Project)
 # ==============================================================================
 # Update with your dedicated Staging GCP Project ID
-project_id         = "p-nsedusc1-core-app-fe-01-staging"
+project_id         = "pid-nse-stg-core-apps-k8ti"
 region             = "us-central1"
-environment        = "staging"
+environment        = "stg"
 artifact_repo_name = "app-repo"
 
 services = {

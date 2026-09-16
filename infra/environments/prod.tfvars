@@ -2,9 +2,9 @@
 # Production Environment Configuration (Prod GCP Project)
 # ==============================================================================
 # Update with your dedicated Production GCP Project ID
-project_id         = "p-nsedusc1-core-app-fe-01-prod"
+project_id         = "pid-nse-prd-core-apps-6aw8"
 region             = "us-central1"
-environment        = "prod"
+environment        = "prd"
 artifact_repo_name = "app-repo"
 
 services = {
