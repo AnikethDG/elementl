@@ -1,0 +1,118 @@
+# ==============================================================================
+# Cloud Build Pipeline: Infrastructure (Terraform)
+# ==============================================================================
+# This pipeline manages infrastructure provisioning via Terraform:
+# - Pull Request Triggers: Runs 'terraform plan' only (_TF_ACTION=plan)
+# - Branch Merge / Push Triggers: Runs 'terraform apply' (_TF_ACTION=apply)
+#
+# Supported Triggers:
+# - dev-core-apps-plan  (_TF_ACTION=plan,  _ENVIRONMENT=dev,     PR to main)
+# - dev-core-apps-push  (_TF_ACTION=apply, _ENVIRONMENT=dev,     Push to main)
+# - stg-core-apps-push  (_TF_ACTION=apply, _ENVIRONMENT=staging, Tag push)
+# - prd-core-apps-push  (_TF_ACTION=apply, _ENVIRONMENT=prod,    Tag push with approval)
+# ==============================================================================
+
+steps:
+  # 1. Terraform Init (connecting to GCS remote backend with environment-isolated prefix)
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        ENV_NAME="${_ENVIRONMENT}"
+        if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
+        if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
+
+        echo "=================================================================="
+        echo "Initializing Terraform for environment: $$ENV_NAME"
+        echo "=================================================================="
+
+        if [ -n "${_STATE_BUCKET}" ]; then
+          terraform init \
+            -backend-config="prefix=terraform/infra/$$ENV_NAME/state" \
+            -backend-config="bucket=${_STATE_BUCKET}"
+        else
+          terraform init \
+            -backend-config="prefix=terraform/infra/$$ENV_NAME/state"
+        fi
+    dir: 'infra'
+
+  # 2. Terraform Plan
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        ENV_NAME="${_ENVIRONMENT}"
+        if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
+        if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
+
+        ENV_FILE="environments/$${ENV_NAME}.tfvars"
+        if [ ! -f "$$ENV_FILE" ]; then
+          if [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
+            ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
+          else
+            echo "ERROR: Environment tfvars file '$$ENV_FILE' not found for _ENVIRONMENT='${_ENVIRONMENT}'!" >&2
+            echo "Available files in infra/environments:" >&2
+            ls -la environments/ >&2
+            exit 1
+          fi
+        fi
+
+        echo "=================================================================="
+        echo "Running Terraform Plan for environment: $$ENV_NAME"
+        echo "Using var-file: $$ENV_FILE"
+        echo "=================================================================="
+
+        terraform plan \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENV_NAME"
+    dir: 'infra'
+
+  # 3. Terraform Apply (only executed when _TF_ACTION is "apply")
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        if [ "${_TF_ACTION}" = "apply" ]; then
+          ENV_NAME="${_ENVIRONMENT}"
+          if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
+          if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
+
+          ENV_FILE="environments/$${ENV_NAME}.tfvars"
+          if [ ! -f "$$ENV_FILE" ]; then
+            if [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
+              ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
+            else
+              echo "ERROR: Environment tfvars file '$$ENV_FILE' not found for _ENVIRONMENT='${_ENVIRONMENT}'!" >&2
+              exit 1
+            fi
+          fi
+
+          echo "=================================================================="
+          echo "Applying Terraform changes for environment: $$ENV_NAME"
+          echo "Using var-file: $$ENV_FILE"
+          echo "=================================================================="
+
+          terraform apply -auto-approve \
+            -var-file="$$ENV_FILE" \
+            -var="region=$_REGION" \
+            -var="environment=$$ENV_NAME"
+        else
+          echo "=================================================================="
+          echo "Skipping terraform apply: _TF_ACTION is set to '${_TF_ACTION}'"
+          echo "(Terraform apply only executes when _TF_ACTION is 'apply')"
+          echo "=================================================================="
+        fi
+    dir: 'infra'
+
+substitutions:
+  _TF_ACTION: 'plan'   # 'plan' (PR triggers / validation) or 'apply' (branch merge / push)
+  _ENVIRONMENT: 'dev'  # 'dev', 'staging'/'stg', 'prod'/'prd'
+  _REGION: 'us-central1'
+  _STATE_BUCKET: ''   # Optional override; defaults to bucket in backend.tf if empty
+
+options:
+  logging: CLOUD_LOGGING_ONLY
