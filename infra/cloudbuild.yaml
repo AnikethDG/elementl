@@ -6,9 +6,9 @@
 # - Branch Merge / Push Triggers: Runs 'terraform apply' (_TF_ACTION=apply)
 #
 # State Isolation & Naming Convention:
-# - Shared GCS Bucket: gcs-pid-ec-cmn-app-tfstate-2b36
+# - Shared GCS Bucket: gcs-pid-ns-cmn-app-tfstate-iv0b
 # - Prefix Pattern: terraform/app-infra/<env_folder>/<project_id>/infra/state
-#   - dev/development -> development/pid-exc-dev-core-apps-fdzr/...
+#   - dev/development -> development/pid-nse-dev-core-apps-dz09/...
 #   - staging         -> staging/<staging-project-id>/...
 #   - prod/production -> production/<prod-project-id>/...
 # ==============================================================================
@@ -57,7 +57,7 @@ steps:
           fi
         fi
 
-        STATE_BUCKET="${_STATE_BUCKET:-gcs-pid-ec-cmn-app-tfstate-2b36}"
+        STATE_BUCKET="${_STATE_BUCKET:-gcs-pid-ns-cmn-app-tfstate-iv0b}"
 
         echo "=================================================================="
         echo "Initializing Terraform for environment: $$ENV_NAME ($$ENV_FOLDER)"
@@ -146,7 +146,7 @@ substitutions:
   _ENVIRONMENT: 'dev'  # 'dev', 'staging'/'stg', 'prod'/'prd'
   _TARGET_PROJECT_ID: '' # Optional override; auto-detected from environments/<env>.tfvars if empty
   _STATE_PREFIX: ''    # Optional override; defaults to terraform/app-infra/<env_folder>/<project_id>/infra/state
-  _STATE_BUCKET: 'gcs-pid-ec-cmn-app-tfstate-2b36' # Shared state bucket for all environments of nse-core-apps
+  _STATE_BUCKET: 'gcs-pid-ns-cmn-app-tfstate-iv0b' # Shared state bucket for all environments of nse-core-apps
   _REGION: 'us-central1'
 
 options:
