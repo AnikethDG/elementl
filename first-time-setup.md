@@ -23,24 +23,23 @@ Before configuring triggers, ensure you have:
 
 2. **Updated Project IDs in `infra/environments/`**:
    - [`infra/environments/dev.tfvars`](file:///Users/umeshkumhar/workspace/bizz/elementl/elementl-nse-core-apps/infra/environments/dev.tfvars): `project_id = "pid-nse-dev-core-apps-dz09"`
-   - [`infra/environments/staging.tfvars`](file:///Users/umeshkumhar/workspace/bizz/elementl/elementl-nse-core-apps/infra/environments/staging.tfvars): `project_id = "YOUR_STAGING_PROJECT_ID"`
-   - [`infra/environments/prod.tfvars`](file:///Users/umeshkumhar/workspace/bizz/elementl/elementl-nse-core-apps/infra/environments/prod.tfvars): `project_id = "YOUR_PROD_PROJECT_ID"`
+   - [`infra/environments/staging.tfvars`](file:///Users/umeshkumhar/workspace/bizz/elementl/elementl-nse-core-apps/infra/environments/staging.tfvars): `project_id = "pid-nse-stg-core-apps-k8ti"`
+   - [`infra/environments/prod.tfvars`](file:///Users/umeshkumhar/workspace/bizz/elementl/elementl-nse-core-apps/infra/environments/prod.tfvars): `project_id = "pid-nse-prd-core-apps-6aw8"`
 
 3. **Set your Terraform GCS State Bucket in [`infra/backend.tf`](file:///Users/umeshkumhar/workspace/bizz/elementl/elementl-nse-core-apps/infra/backend.tf)**:
    ```hcl
    terraform {
      backend "gcs" {
        bucket = "gcs-pid-ns-cmn-app-tfstate-iv0b"
-       prefix = "terraform/app-infra/development/pid-nse-dev-core-apps-dz09/infra/state"
      }
    }
    ```
-   *Note: The shared bucket `gcs-pid-ns-cmn-app-tfstate-iv0b` is used across all environments. State isolation is maintained via environment folders (`development/`, `staging/`, `production/`) and project IDs: `terraform/app-infra/<env_folder>/<project_id>/infra/state`.*
+   *Note: The shared bucket `gcs-pid-ns-cmn-app-tfstate-iv0b` is used across all environments. State isolation is maintained via environment folders (`development/`, `staging/`, `production/`) and project IDs: `terraform/app-infra/<env_folder>/<project_id>`.*
 
 4. **Bootstrapped the Dev Infrastructure**:
    ```bash
    cd infra
-   terraform init -backend-config="bucket=gcs-pid-ns-cmn-app-tfstate-iv0b" -backend-config="prefix=terraform/app-infra/development/pid-nse-dev-core-apps-dz09/infra/state"
+   terraform init -backend-config="bucket=gcs-pid-ns-cmn-app-tfstate-iv0b" -backend-config="prefix=terraform/app-infra/development/pid-nse-dev-core-apps-dz09"
    terraform apply -var-file="environments/dev.tfvars"
    cd ..
    ```

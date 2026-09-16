@@ -1,20 +1,12 @@
 # ==============================================================================
 # Cloud Build Pipeline: Infrastructure (Terraform)
 # ==============================================================================
-# This pipeline manages infrastructure provisioning via Terraform:
-# - Pull Request Triggers: Runs 'terraform plan' only (_TF_ACTION=plan)
-# - Branch Merge / Push Triggers: Runs 'terraform apply' (_TF_ACTION=apply or auto on main)
-#
-# State Isolation & Naming Convention:
-# - Shared GCS Bucket: gcs-pid-ns-cmn-app-tfstate-iv0b
-# - Prefix Pattern: terraform/app-infra/<env_folder>/<project_id>/infra/state
-#   - dev/development -> development/pid-nse-dev-core-apps-dz09/...
-#   - staging         -> staging/<staging-project-id>/...
-#   - prod/production -> production/<prod-project-id>/...
+# - Pull Request Triggers: Runs 'terraform plan' only (detected via native _PR_NUMBER)
+# - Main Merge / Tag Triggers: Runs 'terraform plan' followed by 'terraform apply'
 # ==============================================================================
 
 steps:
-  # 1. Terraform Init (connecting to GCS remote backend with environment-isolated prefix)
+  # 1. Resolve Environment & Terraform Init
   - name: 'hashicorp/terraform:1.5'
     entrypoint: 'sh'
     args:
@@ -24,7 +16,6 @@ steps:
         if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
         if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
 
-        # Determine environment folder (development, staging, production)
         ENV_FOLDER="$$ENV_NAME"
         if [ "$$ENV_NAME" = "dev" ] || [ "$$ENV_NAME" = "development" ]; then
           ENV_FOLDER="development"
@@ -35,38 +26,31 @@ steps:
         fi
 
         ENV_FILE="environments/$${ENV_NAME}.tfvars"
-        if [ ! -f "$$ENV_FILE" ]; then
-          if [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
-            ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
-          fi
+        if [ ! -f "$$ENV_FILE" ] && [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
+          ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
         fi
 
-        # Extract project_id reliably from tfvars if not explicitly provided via substitution
+        # Extract project_id from tfvars
         TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
         if [ -z "$$TARGET_PROJECT_ID" ] && [ -f "$$ENV_FILE" ]; then
           TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$ENV_FILE" | head -n 1)
         fi
 
-        # Determine state prefix
-        STATE_PREFIX="${_STATE_PREFIX}"
-        if [ -z "$$STATE_PREFIX" ]; then
-          if [ -n "$$TARGET_PROJECT_ID" ]; then
-            STATE_PREFIX="terraform/app-infra/$${ENV_FOLDER}/$${TARGET_PROJECT_ID}/infra/state"
-          else
-            STATE_PREFIX="terraform/app-infra/$${ENV_FOLDER}/infra/state"
-          fi
-        fi
+        STATE_BUCKET="${_STATE_BUCKET:-gcs-$${TARGET_PROJECT_ID}-tfstate}"
+        STATE_PREFIX="${_STATE_PREFIX:-terraform/infra/state}"
 
-        STATE_BUCKET="${_STATE_BUCKET:-gcs-pid-ns-cmn-app-tfstate-iv0b}"
+        # Persist context for subsequent steps
+        echo "ENV_NAME=$$ENV_NAME" > .env.build
+        echo "ENV_FILE=$$ENV_FILE" >> .env.build
+        echo "TARGET_PROJECT_ID=$$TARGET_PROJECT_ID" >> .env.build
 
         echo "=================================================================="
-        echo "Initializing Terraform for environment: $$ENV_NAME ($$ENV_FOLDER)"
-        echo "Backend Bucket: $$STATE_BUCKET"
-        echo "State Prefix:   $$STATE_PREFIX"
-        echo "Project ID:     $$TARGET_PROJECT_ID"
+        echo "Initializing Terraform for: $$ENV_NAME ($$ENV_FOLDER)"
+        echo "Bucket: $$STATE_BUCKET"
+        echo "Prefix: $$STATE_PREFIX"
         echo "=================================================================="
 
-        terraform init \
+        terraform init -reconfigure \
           -backend-config="bucket=$$STATE_BUCKET" \
           -backend-config="prefix=$$STATE_PREFIX"
     dir: 'infra'
@@ -77,25 +61,9 @@ steps:
     args:
       - '-c'
       - |
-        ENV_NAME="${_ENVIRONMENT}"
-        if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
-        if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
-
-        ENV_FILE="environments/$${ENV_NAME}.tfvars"
-        if [ ! -f "$$ENV_FILE" ]; then
-          if [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
-            ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
-          else
-            echo "ERROR: Environment tfvars file '$$ENV_FILE' not found for _ENVIRONMENT='${_ENVIRONMENT}'!" >&2
-            echo "Available files in infra/environments:" >&2
-            ls -la environments/ >&2
-            exit 1
-          fi
-        fi
-
+        . ./.env.build
         echo "=================================================================="
-        echo "Running Terraform Plan for environment: $$ENV_NAME"
-        echo "Using var-file: $$ENV_FILE"
+        echo "Running Terraform Plan using: $$ENV_FILE"
         echo "=================================================================="
 
         terraform plan \
@@ -105,72 +73,36 @@ steps:
           -var="environment=$$ENV_NAME"
     dir: 'infra'
 
-  # 3. Terraform Apply (executed on main merge, tag push, or when _TF_ACTION=apply)
+  # 3. Terraform Apply (Skipped on PR triggers)
   - name: 'hashicorp/terraform:1.5'
     entrypoint: 'sh'
     args:
       - '-c'
       - |
-        ENV_NAME="${_ENVIRONMENT}"
-        if [ "$$ENV_NAME" = "stg" ]; then ENV_NAME="staging"; fi
-        if [ "$$ENV_NAME" = "prd" ]; then ENV_NAME="prod"; fi
-
-        ENV_FILE="environments/$${ENV_NAME}.tfvars"
-        if [ ! -f "$$ENV_FILE" ]; then
-          if [ -f "environments/${_ENVIRONMENT}.tfvars" ]; then
-            ENV_FILE="environments/${_ENVIRONMENT}.tfvars"
-          fi
+        # Native Cloud Build PR trigger check or explicit plan mode
+        if [ -n "$_PR_NUMBER" ] || [ "${_TF_ACTION}" = "plan" ]; then
+          echo "=================================================================="
+          echo "PR trigger detected (_PR_NUMBER='$_PR_NUMBER') or _TF_ACTION=plan."
+          echo "Skipping terraform apply (planning only)."
+          echo "=================================================================="
+          exit 0
         fi
 
-        # Determine whether to apply:
-        # 1. Explicitly set to 'apply'
-        # 2. 'auto' (default) on main branch push or tag push
-        CURRENT_BRANCH="$BRANCH_NAME"
-        CURRENT_TAG="$TAG_NAME"
-
-        SHOULD_APPLY=false
-        if [ "${_TF_ACTION}" = "apply" ]; then
-          SHOULD_APPLY=true
-        elif [ "${_TF_ACTION}" = "plan" ]; then
-          SHOULD_APPLY=false
-        elif [ "${_TF_ACTION}" = "auto" ] || [ -z "${_TF_ACTION}" ]; then
-          if [ "$$CURRENT_BRANCH" = "main" ] || [ -n "$$CURRENT_TAG" ]; then
-            SHOULD_APPLY=true
-          fi
-        fi
-
-        if [ "$$SHOULD_APPLY" = "true" ]; then
-          echo "=================================================================="
-          echo "Applying Terraform changes for environment: $$ENV_NAME"
-          echo "Trigger source: BRANCH_NAME='$$CURRENT_BRANCH', TAG_NAME='$$CURRENT_TAG', _TF_ACTION='${_TF_ACTION}'"
-          echo "=================================================================="
-
-          if [ -f tfplan ]; then
-            echo "Applying pre-computed plan file: tfplan"
-            terraform apply -auto-approve tfplan
-          else
-            echo "Applying with var-file: $$ENV_FILE"
-            terraform apply -auto-approve \
-              -var-file="$$ENV_FILE" \
-              -var="region=$_REGION" \
-              -var="environment=$$ENV_NAME"
-          fi
-        else
-          echo "=================================================================="
-          echo "Skipping terraform apply (planning only)"
-          echo "Trigger source: BRANCH_NAME='$$CURRENT_BRANCH', TAG_NAME='$$CURRENT_TAG', _TF_ACTION='${_TF_ACTION}'"
-          echo "(Terraform apply executes on main merge, tag push, or when _TF_ACTION='apply')"
-          echo "=================================================================="
-        fi
+        echo "=================================================================="
+        echo "Applying pre-computed Terraform plan (Branch: $BRANCH_NAME, Tag: $TAG_NAME)"
+        echo "=================================================================="
+        terraform apply -auto-approve tfplan
     dir: 'infra'
 
 substitutions:
-  _TF_ACTION: 'auto'   # 'auto' (applies on main merge / tag push; plans on PRs), or explicitly 'plan' / 'apply'
-  _ENVIRONMENT: 'dev'  # 'dev', 'staging'/'stg', 'prod'/'prd'
-  _TARGET_PROJECT_ID: '' # Optional override; auto-detected from environments/<env>.tfvars if empty
-  _STATE_PREFIX: ''    # Optional override; defaults to terraform/app-infra/<env_folder>/<project_id>/infra/state
-  _STATE_BUCKET: 'gcs-pid-ns-cmn-app-tfstate-iv0b' # Shared state bucket for all environments of nse-core-apps
+  _TF_ACTION: 'auto'     # 'auto' (applies on push/tag, plans on PR), or 'plan' / 'apply'
+  _ENVIRONMENT: 'dev'    # 'dev', 'staging', 'prod'
+  _TARGET_PROJECT_ID: '' # Auto-detected from tfvars if empty
+  _STATE_PREFIX: ''      # Defaults to terraform/infra/state
+  _STATE_BUCKET: ''      # Defaults to gcs-${TARGET_PROJECT_ID}-tfstate
   _REGION: 'us-central1'
+  _PR_NUMBER: ''         # Injected automatically by Cloud Build GitHub PR triggers
 
 options:
   logging: CLOUD_LOGGING_ONLY
+

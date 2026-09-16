@@ -343,7 +343,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
    terraform {
      backend "gcs" {
        bucket = "gcs-pid-ns-cmn-app-tfstate-iv0b"
-       prefix = "terraform/app-infra/development/pid-nse-dev-core-apps-dz09/infra/state"
+       # Prefix is dynamically supplied per environment via -backend-config="prefix=..."
      }
    }
    ```
