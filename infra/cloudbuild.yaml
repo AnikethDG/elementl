@@ -73,17 +73,28 @@ steps:
           -var="environment=$$ENV_NAME"
     dir: 'infra'
 
-  # 3. Terraform Apply (Skipped on PR triggers)
+  # 3. Terraform Apply (Runs ONLY on main branch push, tag push, or explicit _TF_ACTION=apply)
   - name: 'hashicorp/terraform:1.5'
     entrypoint: 'sh'
     args:
       - '-c'
       - |
-        # Native Cloud Build PR trigger check or explicit plan mode
-        if [ -n "$_PR_NUMBER" ] || [ "${_TF_ACTION}" = "plan" ]; then
+        SHOULD_APPLY=false
+        if [ "${_TF_ACTION}" = "apply" ]; then
+          SHOULD_APPLY=true
+        elif [ "${_TF_ACTION}" = "plan" ]; then
+          SHOULD_APPLY=false
+        elif [ "${_TF_ACTION}" = "auto" ] || [ -z "${_TF_ACTION}" ]; then
+          if [ "$BRANCH_NAME" = "main" ] || [ -n "$TAG_NAME" ]; then
+            SHOULD_APPLY=true
+          fi
+        fi
+
+        if [ "$$SHOULD_APPLY" != "true" ]; then
           echo "=================================================================="
-          echo "PR trigger detected (_PR_NUMBER='$_PR_NUMBER') or _TF_ACTION=plan."
           echo "Skipping terraform apply (planning only)."
+          echo "Trigger details: BRANCH_NAME='$BRANCH_NAME', TAG_NAME='$TAG_NAME', _TF_ACTION='${_TF_ACTION}'"
+          echo "(Terraform apply executes only on 'main' branch, tag push, or when _TF_ACTION='apply')"
           echo "=================================================================="
           exit 0
         fi
@@ -95,14 +106,14 @@ steps:
     dir: 'infra'
 
 substitutions:
-  _TF_ACTION: 'auto'     # 'auto' (applies on push/tag, plans on PR), or 'plan' / 'apply'
+  _TF_ACTION: 'auto'     # 'auto' (applies on main/tag, plans on other branches), or 'plan' / 'apply'
   _ENVIRONMENT: 'dev'    # 'dev', 'staging', 'prod'
   _TARGET_PROJECT_ID: '' # Auto-detected from tfvars if empty
   _STATE_PREFIX: ''      # Defaults to terraform/infra/state
   _STATE_BUCKET: ''      # Defaults to gcs-${TARGET_PROJECT_ID}-tfstate
   _REGION: 'us-central1'
-  _PR_NUMBER: ''         # Injected automatically by Cloud Build GitHub PR triggers
 
 options:
   logging: CLOUD_LOGGING_ONLY
+
 
