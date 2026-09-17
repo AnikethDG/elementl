@@ -34,11 +34,11 @@ services = {
 # 7-day rolling basis so it cannot quietly accrue storage cost.
 buckets = {
   "test-bucket" = {
-    storage_class    = "STANDARD"
-    versioning       = false
-    force_destroy    = true
+    storage_class                 = "STANDARD"
+    versioning                    = false
+    force_destroy                 = true
     soft_delete_retention_seconds = 0
-    service_accounts = ["service-api"]
+    service_accounts              = ["service-api"]
     lifecycle_rules = [
       {
         action_type = "Delete"
