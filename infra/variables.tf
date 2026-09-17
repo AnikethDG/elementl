@@ -76,6 +76,9 @@ variable "buckets" {
     force_destroy = optional(bool, false) # Keep false in prod: allows `terraform destroy` to delete objects
     labels        = optional(map(string), {})
 
+    # null keeps the GCS default of 7 days; 0 disables soft delete entirely
+    soft_delete_retention_seconds = optional(number)
+
     # Cloud Run services (keys of var.services) granted access to this bucket
     service_accounts     = optional(list(string), [])
     service_account_role = optional(string, "roles/storage.objectAdmin")

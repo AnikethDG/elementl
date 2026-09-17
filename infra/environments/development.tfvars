@@ -37,6 +37,7 @@ buckets = {
     storage_class    = "STANDARD"
     versioning       = false
     force_destroy    = true
+    soft_delete_retention_seconds = 0
     service_accounts = ["service-api"]
     lifecycle_rules = [
       {

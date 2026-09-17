@@ -22,6 +22,16 @@ resource "google_storage_bucket" "buckets" {
     enabled = each.value.versioning
   }
 
+  # GCS retains soft-deleted objects for 7 days by default, and bills for them
+  # the whole time. Set soft_delete_retention_seconds = 0 on throwaway buckets
+  # so a delete is actually a delete. Omit to keep the GCS default.
+  dynamic "soft_delete_policy" {
+    for_each = each.value.soft_delete_retention_seconds == null ? [] : [each.value.soft_delete_retention_seconds]
+    content {
+      retention_duration_seconds = soft_delete_policy.value
+    }
+  }
+
   dynamic "lifecycle_rule" {
     for_each = each.value.lifecycle_rules
     content {
