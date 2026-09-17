@@ -9,6 +9,10 @@
 # by a bare `terraform apply` that falls back to the terraform.tfvars project.
 # Hardcoding an ID is acceptable for a test resource; do not copy this pattern
 # for anything permanent.
+#
+# No IAM binding: nothing reads this bucket yet, and the Terraform runner lacks
+# storage.buckets.setIamPolicy, so granting access here would fail the apply.
+# Add a google_storage_bucket_iam_member when something actually needs it.
 locals {
   test_bucket_project = "pid-nse-dev-core-apps-dz09"
 }
@@ -37,11 +41,4 @@ resource "google_storage_bucket" "test" {
       age = 7
     }
   }
-}
-
-resource "google_storage_bucket_iam_member" "test_access" {
-  count  = var.project_id == local.test_bucket_project ? 1 : 0
-  bucket = google_storage_bucket.test[0].name
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.cloud_run_sa["service-api"].email}"
 }
