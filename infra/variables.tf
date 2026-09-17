@@ -89,21 +89,6 @@ variable "buckets" {
       matches_storage_class = optional(list(string))
     })), [])
   }))
-  default = {
-    "app-data" = {
-      storage_class    = "STANDARD"
-      versioning       = true
-      force_destroy    = false
-      service_accounts = ["service-api"]
-      lifecycle_rules = [
-        {
-          # Reclaim storage from old object versions after 30 days
-          action_type        = "Delete"
-          with_state         = "ARCHIVED"
-          num_newer_versions = 3
-          age                = 30
-        }
-      ]
-    }
-  }
+  # Empty by default: a bucket is created only in environments that opt in
+  default = {}
 }
