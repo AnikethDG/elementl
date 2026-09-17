@@ -29,7 +29,8 @@ variable "enable_apis" {
     "artifactregistry.googleapis.com",
     "cloudbuild.googleapis.com",
     "iam.googleapis.com",
-    "serviceusage.googleapis.com"
+    "serviceusage.googleapis.com",
+    "storage.googleapis.com"
   ]
 }
 
