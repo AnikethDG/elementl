@@ -31,3 +31,17 @@ output "service_accounts" {
     for k, v in google_service_account.cloud_run_sa : k => v.email
   }
 }
+
+output "bucket_names" {
+  description = "Cloud Storage bucket names, keyed by their short name"
+  value = {
+    for k, v in google_storage_bucket.buckets : k => v.name
+  }
+}
+
+output "bucket_urls" {
+  description = "Cloud Storage bucket gs:// URLs, keyed by their short name"
+  value = {
+    for k, v in google_storage_bucket.buckets : k => v.url
+  }
+}

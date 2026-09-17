@@ -21,3 +21,22 @@ services = {
     }
   }
 }
+
+# Storage Configuration
+# Bucket name resolves to "<project_id>-app-data"
+buckets = {
+  "app-data" = {
+    storage_class    = "STANDARD"
+    versioning       = true
+    force_destroy    = false
+    service_accounts = ["service-api"]
+    lifecycle_rules = [
+      {
+        action_type        = "Delete"
+        with_state         = "ARCHIVED"
+        num_newer_versions = 3
+        age                = 30
+      }
+    ]
+  }
+}

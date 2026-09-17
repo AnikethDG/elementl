@@ -25,3 +25,28 @@ services = {
     }
   }
 }
+
+buckets = {
+  "app-data" = {
+    storage_class    = "STANDARD"
+    versioning       = true
+    force_destroy    = false
+    service_accounts = ["service-api"]
+    lifecycle_rules = [
+      {
+        # Age off old object versions, keeping the 3 most recent
+        action_type        = "Delete"
+        with_state         = "ARCHIVED"
+        num_newer_versions = 3
+        age                = 90
+      },
+      {
+        # Cool current objects that have not been touched in a year
+        action_type   = "SetStorageClass"
+        storage_class = "NEARLINE"
+        with_state    = "LIVE"
+        age           = 365
+      }
+    ]
+  }
+}

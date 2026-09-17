@@ -24,3 +24,20 @@ services = {
     }
   }
 }
+
+buckets = {
+  "app-data" = {
+    storage_class    = "STANDARD"
+    versioning       = true
+    force_destroy    = true # Dev buckets are disposable
+    service_accounts = ["service-api"]
+    lifecycle_rules = [
+      {
+        action_type        = "Delete"
+        with_state         = "ARCHIVED"
+        num_newer_versions = 1
+        age                = 7
+      }
+    ]
+  }
+}
