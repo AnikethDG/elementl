@@ -25,8 +25,10 @@ services = {
   }
 }
 
+# Test bucket. Resolves to "<project_id>-test-bucket" -- a bare "test-bucket"
+# is not available, GCS bucket names are globally unique across all projects.
 buckets = {
-  "app-data" = {
+  "test-bucket" = {
     storage_class    = "STANDARD"
     versioning       = true
     force_destroy    = true # Dev buckets are disposable
