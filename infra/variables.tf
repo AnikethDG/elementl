@@ -65,33 +65,3 @@ variable "services" {
     }
   }
 }
-
-variable "buckets" {
-  description = "Map of Cloud Storage buckets to provision. The map key is the short name; the full bucket name defaults to \"<project_id>-<key>\" to satisfy the global uniqueness requirement."
-  type = map(object({
-    name          = optional(string)             # Override the generated "<project_id>-<key>" name
-    location      = optional(string)             # Defaults to var.region
-    storage_class = optional(string, "STANDARD") # STANDARD, NEARLINE, COLDLINE, ARCHIVE
-    versioning    = optional(bool, true)
-    force_destroy = optional(bool, false) # Keep false in prod: allows `terraform destroy` to delete objects
-    labels        = optional(map(string), {})
-
-    # null keeps the GCS default of 7 days; 0 disables soft delete entirely
-    soft_delete_retention_seconds = optional(number)
-
-    # Cloud Run services (keys of var.services) granted access to this bucket
-    service_accounts     = optional(list(string), [])
-    service_account_role = optional(string, "roles/storage.objectAdmin")
-
-    lifecycle_rules = optional(list(object({
-      action_type           = string           # Delete or SetStorageClass
-      storage_class         = optional(string) # Required when action_type = SetStorageClass
-      age                   = optional(number)
-      num_newer_versions    = optional(number)
-      with_state            = optional(string) # LIVE, ARCHIVED, ANY
-      matches_storage_class = optional(list(string))
-    })), [])
-  }))
-  # Empty by default: a bucket is created only in environments that opt in
-  default = {}
-}

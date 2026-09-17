@@ -24,27 +24,3 @@ services = {
     }
   }
 }
-
-# Test bucket. Resolves to "<project_id>-test-bucket" -- a bare "test-bucket"
-# is not available, GCS bucket names are globally unique across all projects.
-#
-# Built to be thrown away: versioning is off so there are no noncurrent
-# versions to sweep up, force_destroy lets `terraform destroy` remove the
-# bucket while it still holds objects, and the lifecycle rule empties it on a
-# 7-day rolling basis so it cannot quietly accrue storage cost.
-buckets = {
-  "test-bucket" = {
-    storage_class                 = "STANDARD"
-    versioning                    = false
-    force_destroy                 = true
-    soft_delete_retention_seconds = 0
-    service_accounts              = ["service-api"]
-    lifecycle_rules = [
-      {
-        action_type = "Delete"
-        with_state  = "LIVE"
-        age         = 7
-      }
-    ]
-  }
-}
