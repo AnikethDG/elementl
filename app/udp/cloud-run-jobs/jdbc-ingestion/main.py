@@ -108,13 +108,19 @@ def ensure_and_populate_bq_table(
     schema_fields: list[bigquery.SchemaField] = []
     for col in all_columns:
         col_lower = col.lower()
-        sample_val = next((r.get(col_lower) for r in rows if r.get(col_lower) is not None), None)
-        if isinstance(sample_val, bool):
+        non_null_vals = [r.get(col_lower) for r in rows if r.get(col_lower) is not None]
+        if not non_null_vals:
+            bq_type = "STRING"
+        elif any(isinstance(v, str) for v in non_null_vals):
+            bq_type = "STRING"
+        elif all(isinstance(v, bool) for v in non_null_vals):
             bq_type = "BOOL"
-        elif isinstance(sample_val, int):
-            bq_type = "INT64"
-        elif isinstance(sample_val, float):
+        elif any(isinstance(v, float) for v in non_null_vals) and all(
+            isinstance(v, (int, float)) and not isinstance(v, bool) for v in non_null_vals
+        ):
             bq_type = "FLOAT64"
+        elif all(isinstance(v, int) and not isinstance(v, bool) for v in non_null_vals):
+            bq_type = "INT64"
         else:
             bq_type = "STRING"
         schema_fields.append(bigquery.SchemaField(col_lower, bq_type, mode="NULLABLE"))
