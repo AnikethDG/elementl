@@ -65,3 +65,54 @@ module "udp_cloud_run_jobs" {
     P6_SCHEMA       = "ELEMENTL_PMDB_SBOX_PXRPTUSER"
   }
 }
+
+# Resource-Level Least-Privilege IAM (Compensating Control: No Project-Level Data Roles)
+resource "google_secret_manager_secret_iam_member" "jdbc_p6_config_access" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.udp_secrets["secret-p6-db-config"].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.udp_cloud_run_jobs["jdbc-ingestion"].service_account_email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "jdbc_p6_ca_access" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.udp_secrets["secret-p6-db-ca-bundle"].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.udp_cloud_run_jobs["jdbc-ingestion"].service_account_email}"
+}
+
+resource "google_bigquery_dataset_iam_member" "jdbc_p6_raw_dataset_access" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.datasets["raw_p6"].dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${module.udp_cloud_run_jobs["jdbc-ingestion"].service_account_email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "suiteql_netsuite_config_access" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.udp_secrets["secret-netsuite-config"].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.udp_cloud_run_jobs["suiteql-ingestion"].service_account_email}"
+}
+
+resource "google_bigquery_dataset_iam_member" "suiteql_netsuite_raw_dataset_access" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.datasets["raw_netsuite"].dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${module.udp_cloud_run_jobs["suiteql-ingestion"].service_account_email}"
+}
+
+resource "google_bigquery_dataset_iam_member" "arcgis_atlas_raw_dataset_access" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.datasets["raw_atlas"].dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${module.udp_cloud_run_jobs["arcgis-ingestion"].service_account_email}"
+}
+
+resource "google_bigquery_dataset_iam_member" "bulk_atlas_raw_dataset_access" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.datasets["raw_atlas"].dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${module.udp_cloud_run_jobs["bulk-ingestion"].service_account_email}"
+}
+
