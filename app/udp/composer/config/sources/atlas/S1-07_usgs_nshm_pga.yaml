@@ -1,0 +1,40 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+template: ingestion_task_metadata
+version: '1.0'
+task_id: atlas_s1_07_usgs_nshm_pga
+description: "USGS 2023 National Seismic Hazard Model (ScienceBase DOI 10.5066/P9GNPCOD per Akshya)"
+metadata_status: Active
+source:
+  type: bulk
+  atlas_source_id: "S1-07"
+  endpoint: "https://www.sciencebase.gov/catalog/item/589097b1e4b072a7ac0cae23?format=json"
+  load_type: full_refresh
+  page_size: 500
+  timeout_seconds: 300
+engine:
+  type: cloud_run_job
+  job_name: bulk-ingestion
+  timeout_seconds: 600
+  memory: 4Gi
+destination:
+  format: PARQUET
+  gcs_bucket: bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw
+  gcs_prefix: atlas/raw/S1-07
+  bq_project: pid-nse-stg-core-apps-k8ti
+  bq_dataset: raw_atlas
+  bq_table: seismic_pga_usgs_nshm_2023
+  envelope_table: atlas_raw_envelope
+  write_disposition: WRITE_TRUNCATE

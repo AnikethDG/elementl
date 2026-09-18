@@ -1,0 +1,46 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+template: ingestion_task_metadata
+version: '1.0'
+task_id: netsuite_transactionLine
+description: Extracts NetSuite transactionLine via OAuth 2.0 M2M JWT SuiteQL Cloud Run Job
+metadata_status: Active
+source:
+  type: netsuite
+  connection_secret_id: secret-netsuite-api-config
+  private_key_secret_id: secret-netsuite-private-key
+  account_id_secret_id: secret-netsuite-account-id
+  client_id_secret_id: secret-netsuite-client-id
+  certificate_id_secret_id: secret-netsuite-certificate-id
+  scope_secret_id: secret-netsuite-scope
+  extraction_type: suiteql
+  query: "SELECT transaction, id AS line_id, item, account, department, class, location, netamount, foreignamount, memo, lastmodifieddate FROM transactionLine"
+  load_type: incremental
+  watermark_column: lastmodifieddate
+  page_size: 1000
+  timeout_seconds: 300
+engine:
+  type: cloud_run_job
+  job_name: suiteql-ingestion
+  timeout_seconds: 600
+  memory: 4Gi
+destination:
+  format: PARQUET
+  gcs_bucket: bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw
+  gcs_prefix: netsuite/raw/transactionLine
+  bq_project: pid-nse-stg-core-apps-k8ti
+  bq_dataset: raw_netsuite
+  bq_table: netsuite_transactionline
+  write_disposition: WRITE_TRUNCATE

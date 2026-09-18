@@ -16,19 +16,19 @@
 locals {
   ingestion_jobs = {
     "arcgis-ingestion" = {
-      description = "Atlas ArcGIS MapServer / FeatureServer REST ingestion worker (S1-02, S1-06)"
+      description = "Atlas ArcGIS MapServer / FeatureServer REST ingestion worker (S1-02 Substations, S1-06 USGS Qfaults, S2-10 FEMA RAPT Hospitals)"
       cpu         = "2"
       memory      = "4Gi"
       source_type = "ARCGIS"
     }
     "bulk-ingestion" = {
-      description = "Atlas bulk shapefile/zip download, unpacking, and tabular API ingestion worker (S1-01, S2-20)"
+      description = "Atlas bulk shapefile/zip download, unpacking, and tabular API ingestion worker (S1-01 USGS Streamflow, S2-20 Census, S1-07 USGS NSHM)"
       cpu         = "2"
       memory      = "4Gi"
       source_type = "BULK"
     }
     "suiteql-ingestion" = {
-      description = "Oracle NetSuite SuiteAnalytics / SuiteQL REST API ingestion worker (11 tables)"
+      description = "Oracle NetSuite OAuth 2.0 M2M JWT SuiteQL REST API ingestion worker (11 tables)"
       cpu         = "2"
       memory      = "4Gi"
       source_type = "SUITEQL"
@@ -40,6 +40,16 @@ locals {
       source_type = "JDBC_P6"
     }
   }
+
+  netsuite_secret_ids = toset([
+    "secret-netsuite-config",
+    "secret-netsuite-api-config",
+    "secret-netsuite-account-id",
+    "secret-netsuite-client-id",
+    "secret-netsuite-certificate-id",
+    "secret-netsuite-scope",
+    "secret-netsuite-private-key",
+  ])
 }
 
 module "udp_cloud_run_jobs" {
@@ -57,12 +67,15 @@ module "udp_cloud_run_jobs" {
   raw_bucket_name = google_storage_bucket.udp_bronze_raw.name
 
   env_vars = {
-    GCP_PROJECT_ID  = var.project_id
-    ENVIRONMENT     = var.environment
-    RAW_BUCKET_NAME = google_storage_bucket.udp_bronze_raw.name
-    ARCHIVE_BUCKET  = google_storage_bucket.udp_bronze_archive.name
-    SOURCE_TYPE     = each.value.source_type
-    P6_SCHEMA       = "ELEMENTL_PMDB_SBOX_PXRPTUSER"
+    GCP_PROJECT_ID                = var.project_id
+    GCP_PROJECT                   = var.project_id
+    ENVIRONMENT                   = var.environment
+    RAW_BUCKET_NAME               = google_storage_bucket.udp_bronze_raw.name
+    ARCHIVE_BUCKET                = google_storage_bucket.udp_bronze_archive.name
+    SOURCE_TYPE                   = each.value.source_type
+    P6_SCHEMA                     = "ELEMENTL_PMDB_SBOX_PXRPTUSER"
+    NETSUITE_PRIVATE_KEY_SECRET_ID = "secret-netsuite-private-key"
+    NETSUITE_SCOPE                = "rest_webservices"
   }
 }
 
@@ -88,9 +101,10 @@ resource "google_bigquery_dataset_iam_member" "jdbc_p6_raw_dataset_access" {
   member     = "serviceAccount:${module.udp_cloud_run_jobs["jdbc-ingestion"].service_account_email}"
 }
 
-resource "google_secret_manager_secret_iam_member" "suiteql_netsuite_config_access" {
+resource "google_secret_manager_secret_iam_member" "suiteql_netsuite_secrets_access" {
+  for_each  = local.netsuite_secret_ids
   project   = var.project_id
-  secret_id = google_secret_manager_secret.udp_secrets["secret-netsuite-config"].secret_id
+  secret_id = google_secret_manager_secret.udp_secrets[each.key].secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${module.udp_cloud_run_jobs["suiteql-ingestion"].service_account_email}"
 }

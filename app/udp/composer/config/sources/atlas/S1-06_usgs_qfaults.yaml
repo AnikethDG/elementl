@@ -1,0 +1,40 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+template: ingestion_task_metadata
+version: '1.0'
+task_id: atlas_s1_06_usgs_qfaults
+description: "USGS Quaternary Fault & Fold Database MapServer (Case-sensitive Qfaults per Akshya)"
+metadata_status: Active
+source:
+  type: arcgis
+  atlas_source_id: "S1-06"
+  endpoint: "https://earthquake.usgs.gov/arcgis/rest/services/haz/Qfaults/MapServer/0/query"
+  load_type: full_refresh
+  page_size: 500
+  timeout_seconds: 300
+engine:
+  type: cloud_run_job
+  job_name: arcgis-ingestion
+  timeout_seconds: 600
+  memory: 4Gi
+destination:
+  format: PARQUET
+  gcs_bucket: bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw
+  gcs_prefix: atlas/raw/S1-06
+  bq_project: pid-nse-stg-core-apps-k8ti
+  bq_dataset: raw_atlas
+  bq_table: capable_faults_usgs_qfaults
+  envelope_table: atlas_raw_envelope
+  write_disposition: WRITE_TRUNCATE

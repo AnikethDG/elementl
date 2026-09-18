@@ -20,6 +20,12 @@ resource "google_secret_manager_secret" "udp_secrets" {
     "secret-p6-api-username",
     "secret-p6-api-password",
     "secret-netsuite-config",
+    "secret-netsuite-api-config",
+    "secret-netsuite-account-id",
+    "secret-netsuite-client-id",
+    "secret-netsuite-certificate-id",
+    "secret-netsuite-scope",
+    "secret-netsuite-private-key",
   ])
 
   project   = var.project_id
