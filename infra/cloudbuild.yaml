@@ -1,12 +1,12 @@
 # ==============================================================================
-# Cloud Build Pipeline: Infrastructure (Terraform)
+# Cloud Build Pipeline: Infrastructure (Root infra/ + UDP infra/udp/)
 # ==============================================================================
-# - Pull Request Triggers: Runs 'terraform plan' only (detected via native _PR_NUMBER)
+# - Pull Request Triggers: Runs 'terraform plan' only (for both infra/ and infra/udp/)
 # - Main Merge / Tag Triggers: Runs 'terraform plan' followed by 'terraform apply'
 # ==============================================================================
 
 steps:
-  # 1. Resolve Environment & Terraform Init
+  # 1. Resolve Environment & Terraform Init (Root infra/ + UDP infra/udp/)
   - name: 'hashicorp/terraform:1.5'
     entrypoint: 'sh'
     args:
@@ -53,20 +53,27 @@ steps:
         echo "ENVIRONMENT_SHORT=$$ENVIRONMENT_SHORT" >> .env.build
         echo "ENV_FILE=$$ENV_FILE" >> .env.build
         echo "TARGET_PROJECT_ID=$$TARGET_PROJECT_ID" >> .env.build
+        echo "STATE_BUCKET=$$STATE_BUCKET" >> .env.build
 
         echo "=================================================================="
-        echo "Initializing Terraform for: $$ENVIRONMENT ($$ENVIRONMENT_SHORT)"
-        echo "Target Project: $$TARGET_PROJECT_ID"
-        echo "Bucket: $$STATE_BUCKET"
-        echo "Prefix: $$STATE_PREFIX"
+        echo "Initializing Root Terraform (infra/) for: $$ENVIRONMENT ($$ENVIRONMENT_SHORT)"
+        echo "Target Project: $$TARGET_PROJECT_ID | Bucket: $$STATE_BUCKET"
         echo "=================================================================="
 
         terraform init -reconfigure \
           -backend-config="bucket=$$STATE_BUCKET" \
           -backend-config="prefix=$$STATE_PREFIX"
+
+        echo "=================================================================="
+        echo "Initializing UDP Terraform (infra/udp/) for: $$ENVIRONMENT ($$ENVIRONMENT_SHORT)"
+        echo "=================================================================="
+        cd udp
+        terraform init -reconfigure \
+          -backend-config="bucket=$$STATE_BUCKET" \
+          -backend-config="prefix=terraform/udp/state"
     dir: 'infra'
 
-  # 2. Terraform Plan
+  # 2. Terraform Plan (Root infra/ + UDP infra/udp/)
   - name: 'hashicorp/terraform:1.5'
     entrypoint: 'sh'
     args:
@@ -74,9 +81,18 @@ steps:
       - |
         . ./.env.build
         echo "=================================================================="
-        echo "Running Terraform Plan using: $$ENV_FILE ($$ENVIRONMENT / $$ENVIRONMENT_SHORT)"
+        echo "Running Root Terraform Plan (infra/) using: $$ENV_FILE"
         echo "=================================================================="
+        terraform plan \
+          -out=tfplan \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT"
 
+        echo "=================================================================="
+        echo "Running UDP Terraform Plan (infra/udp/) using: $$ENV_FILE"
+        echo "=================================================================="
+        cd udp
         terraform plan \
           -out=tfplan \
           -var-file="$$ENV_FILE" \
@@ -112,8 +128,14 @@ steps:
         fi
 
         echo "=================================================================="
-        echo "Applying pre-computed Terraform plan for $$ENVIRONMENT (Branch: $BRANCH_NAME, Tag: $TAG_NAME)"
+        echo "Applying Root Terraform plan (infra/) for $$ENVIRONMENT"
         echo "=================================================================="
+        terraform apply -auto-approve tfplan
+
+        echo "=================================================================="
+        echo "Applying UDP Terraform plan (infra/udp/) for $$ENVIRONMENT"
+        echo "=================================================================="
+        cd udp
         terraform apply -auto-approve tfplan
     dir: 'infra'
 
@@ -127,5 +149,3 @@ substitutions:
 
 options:
   logging: CLOUD_LOGGING_ONLY
-
-
