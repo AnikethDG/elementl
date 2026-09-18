@@ -1,0 +1,30 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+task_id: p6_project
+source_system: p6
+ingestion_job: jdbc-ingestion
+source_schema: ELEMENTL_PMDB_SBOX_PXRPTUSER
+source_table: PROJECT
+primary_key: OBJECTID
+watermark_column: LASTUPDATEDATE
+sample_where_clause: "ROWNUM <= 20"
+target_dataset: raw_p6
+target_table: p6_project
+silver_dataset: silver_p6
+silver_table: stg_p6_project
+dataform_tags:
+  - p6
+  - p6_project
+schedule: "@daily"

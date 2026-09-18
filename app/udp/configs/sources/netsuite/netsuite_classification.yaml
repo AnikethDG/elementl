@@ -1,0 +1,29 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+task_id: netsuite_classification
+source_system: netsuite
+ingestion_job: suiteql-ingestion
+source_table: classification
+primary_key: id
+watermark_column: lastmodifieddate
+sample_where_clause: "ROWNUM <= 20"
+target_dataset: raw_netsuite
+target_table: netsuite_classification
+silver_dataset: silver_netsuite
+silver_table: stg_netsuite_classification
+dataform_tags:
+  - netsuite
+  - netsuite_classification
+schedule: "@daily"

@@ -1,0 +1,17 @@
+{
+  "gcp_project_id": "pid-nse-stg-core-apps-k8ti",
+  "gcp_region": "us-central1",
+  "environment": "staging",
+  "static_nat_ip": "136.115.148.145",
+  "raw_landing_bucket": "bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw",
+  "archive_bucket": "bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-archive",
+  "p6_schema": "ELEMENTL_PMDB_SBOX_PXRPTUSER",
+  "dataform_repository": "gcp-dataform-transformations",
+  "dataform_workspace": "staging",
+  "cloud_run_jobs": {
+    "p6": "jdbc-ingestion",
+    "netsuite": "suiteql-ingestion",
+    "atlas_arcgis": "arcgis-ingestion",
+    "atlas_bulk": "bulk-ingestion"
+  }
+}
