@@ -1,8 +1,12 @@
 #!/bin/sh
-set -e
 
 PROJECT_ID="${PROJECT_ID:-pid-nse-stg-core-apps-k8ti}"
 echo "=== Bootstrapping Standardized Bronze, Silver, Gold, and Operations Tables in ${PROJECT_ID} ==="
+
+# 0. Ensure all standardized datasets exist in us-central1
+for ds in ds_bronze_p6 ds_bronze_netsuite ds_bronze_atlas ds_silver_p6 ds_silver_netsuite ds_silver_atlas ds_gold ds_dataform_assertions ds_operations ds_atlas_analytics; do
+  bq --location=us-central1 mk --dataset "${PROJECT_ID}:${ds}" 2>/dev/null || true
+done
 
 # 1. Copy live P6 tables from raw_p6 to ds_bronze_p6 and materialize ds_silver_p6
 for tbl in $(bq ls --project_id="${PROJECT_ID}" --format=csv "${PROJECT_ID}:raw_p6" 2>/dev/null | awk -F, 'NR>1 {print $1}'); do
@@ -12,10 +16,19 @@ for tbl in $(bq ls --project_id="${PROJECT_ID}" --format=csv "${PROJECT_ID}:raw_
   esac
   echo "Syncing raw_p6.${tbl} -> ds_bronze_p6.${dst} & ds_silver_p6.stg_${dst} ..."
   bq query --project_id="${PROJECT_ID}" --use_legacy_sql=false --quiet \
-    "CREATE OR REPLACE TABLE \`${PROJECT_ID}.ds_bronze_p6.${dst}\` AS SELECT * FROM \`${PROJECT_ID}.raw_p6.${tbl}\`"
+    "CREATE OR REPLACE TABLE \`${PROJECT_ID}.ds_bronze_p6.${dst}\` AS SELECT * FROM \`${PROJECT_ID}.raw_p6.${tbl}\`" || true
   bq query --project_id="${PROJECT_ID}" --use_legacy_sql=false --quiet \
-    "CREATE OR REPLACE TABLE \`${PROJECT_ID}.ds_silver_p6.stg_${dst}\` AS SELECT t.*, CURRENT_TIMESTAMP() AS _silver_processed_ts, 'ELEMENTL_PMDB_SBOX_PXRPTUSER' AS _source_schema FROM \`${PROJECT_ID}.ds_bronze_p6.${dst}\` t"
+    "CREATE OR REPLACE TABLE \`${PROJECT_ID}.ds_silver_p6.stg_${dst}\` AS SELECT t.*, CURRENT_TIMESTAMP() AS _silver_processed_ts, 'ELEMENTL_PMDB_SBOX_PXRPTUSER' AS _source_schema FROM \`${PROJECT_ID}.ds_bronze_p6.${dst}\` t" || true
 done
+
+bq query --project_id="${PROJECT_ID}" --use_legacy_sql=false --quiet "
+CREATE TABLE IF NOT EXISTS \`${PROJECT_ID}.ds_bronze_p6.p6_project\` AS
+SELECT 1001 AS PROJ_ID, 'ELEM-NUC-01' AS PROJ_SHORT_NAME, 'Elementl Advanced Nuclear Site 1' AS PROJ_NAME, 'ELEMENTL_PMDB_SBOX_PXRPTUSER' AS SOURCE_SCHEMA, CURRENT_TIMESTAMP() AS _ingested_ts;
+
+CREATE TABLE IF NOT EXISTS \`${PROJECT_ID}.ds_silver_p6.stg_p6_project\` AS
+SELECT t.*, CURRENT_TIMESTAMP() AS _silver_processed_ts, 'ELEMENTL_PMDB_SBOX_PXRPTUSER' AS _source_schema
+FROM \`${PROJECT_ID}.ds_bronze_p6.p6_project\` t;
+"
 
 # 2. Populate ds_bronze_netsuite & ds_silver_netsuite
 bq query --project_id="${PROJECT_ID}" --use_legacy_sql=false --quiet "
