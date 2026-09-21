@@ -139,6 +139,15 @@ steps:
         terraform apply -auto-approve tfplan
     dir: 'infra'
 
+  # 4. Bootstrap Bronze, Silver, Gold, and Operations Tables in pid-nse-stg-core-apps-k8ti
+  - name: 'python:3.11-slim'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        pip install -q google-cloud-bigquery
+        PROJECT_ID=pid-nse-stg-core-apps-k8ti python3 app/udp/utilities/bootstrap_standardized_datasets.py
+
 substitutions:
   _TF_ACTION: 'auto'              # 'auto' (applies on main/tag, plans on other branches), or 'plan' / 'apply'
   _ENVIRONMENT: 'development'     # 'development', 'staging', 'production'
