@@ -149,30 +149,3 @@ substitutions:
 
 options:
   logging: CLOUD_LOGGING_ONLY
-
-  # Temporary Step: Apply Standardized UDP Datasets & Buckets + Bootstrap Bronze/Silver/Gold Data (Rule 8)
-  - name: 'hashicorp/terraform:1.5'
-    entrypoint: 'sh'
-    args:
-      - '-c'
-      - |
-        . ./.env.build
-        cd udp
-        terraform apply -auto-approve \
-          -var-file="$$ENV_FILE" \
-          -var="region=$_REGION" \
-          -var="environment=$$ENVIRONMENT" \
-          -target=google_bigquery_dataset.datasets \
-          -target=google_storage_bucket.udp_bronze_raw \
-          -target=google_storage_bucket.udp_bronze_archive \
-          -target=google_storage_bucket.udp_landing_staging \
-          -target=google_storage_bucket.udp_dataflow_temp
-    dir: 'infra'
-
-  - name: 'python:3.11-slim'
-    entrypoint: 'sh'
-    args:
-      - '-c'
-      - |
-        pip install -q google-cloud-bigquery
-        PROJECT_ID=pid-nse-stg-core-apps-k8ti python3 app/udp/utilities/bootstrap_standardized_datasets.py
