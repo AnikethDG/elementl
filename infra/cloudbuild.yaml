@@ -98,6 +98,15 @@ steps:
           -var-file="$$ENV_FILE" \
           -var="region=$_REGION" \
           -var="environment=$$ENVIRONMENT"
+        terraform apply -auto-approve \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT" \
+          -target=google_bigquery_dataset.datasets \
+          -target=google_storage_bucket.udp_bronze_raw \
+          -target=google_storage_bucket.udp_bronze_archive \
+          -target=google_storage_bucket.udp_landing_staging \
+          -target=google_storage_bucket.udp_dataflow_temp
     dir: 'infra'
 
   # 3. Terraform Apply (Runs ONLY on main branch push, tag push, or explicit _TF_ACTION=apply)
@@ -133,11 +142,28 @@ steps:
         terraform apply -auto-approve tfplan
 
         echo "=================================================================="
-        echo "Applying UDP Terraform plan (infra/udp/) for $$ENVIRONMENT"
+        echo "Applying UDP Datasets & Buckets (infra/udp/)"
         echo "=================================================================="
         cd udp
-        terraform apply -auto-approve tfplan
+        terraform apply -auto-approve \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT" \
+          -target=google_bigquery_dataset.datasets \
+          -target=google_storage_bucket.udp_bronze_raw \
+          -target=google_storage_bucket.udp_bronze_archive \
+          -target=google_storage_bucket.udp_landing_staging \
+          -target=google_storage_bucket.udp_dataflow_temp
     dir: 'infra'
+
+  # 4. Bootstrap Bronze, Silver, and Gold Tables in pid-nse-stg-core-apps-k8ti
+  - name: 'python:3.11-slim'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        pip install -q google-cloud-bigquery
+        PROJECT_ID=pid-nse-stg-core-apps-k8ti python3 app/udp/utilities/bootstrap_standardized_datasets.py
 
 substitutions:
   _TF_ACTION: 'auto'              # 'auto' (applies on main/tag, plans on other branches), or 'plan' / 'apply'
