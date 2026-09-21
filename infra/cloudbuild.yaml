@@ -139,12 +139,6 @@ steps:
         terraform apply -auto-approve tfplan
     dir: 'infra'
 
-  # 4. Bootstrap Bronze, Silver, Gold, and Operations Tables in pid-nse-stg-core-apps-k8ti
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:alpine'
-    entrypoint: 'sh'
-    args:
-      - 'app/udp/utilities/bootstrap_bq_tables.sh'
-
 substitutions:
   _TF_ACTION: 'auto'              # 'auto' (applies on main/tag, plans on other branches), or 'plan' / 'apply'
   _ENVIRONMENT: 'development'     # 'development', 'staging', 'production'
