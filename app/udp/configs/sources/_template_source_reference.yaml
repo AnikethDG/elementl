@@ -1,0 +1,153 @@
+# ==============================================================================
+# ELEMENTL INGESTION PLATFORM - CANONICAL SOURCE METADATA REFERENCE TEMPLATE
+# ==============================================================================
+# This template defines the standardized metadata schema required to register and
+# onboard any new data source or table into the Elementl Data Ingestion Framework.
+#
+# To onboard a new source:
+#   1. Copy this template to app/udp/configs/sources/<source_type>/<task_id>.yaml
+#   2. Choose the appropriate source connection pattern (Relational/ERP vs. REST/Geospatial)
+#   3. Select the target execution engine (Cloud Run Job: suiteql, jdbc, arcgis, bulk)
+#   4. Configure the destination landing parameters (GCS Bronze raw lake & BigQuery Bronze dataset)
+#   5. Define scheduling and operational SLA tags in the orchestration block
+#   6. Deploy the YAML to gs://bkt-pid-nse-stg-core-apps-k8ti-udp-configs/sources/ or commit locally
+#   7. Cloud Composer Airflow Dynamic DAG Factory automatically generates the DAG
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. GOVERNANCE & METADATA HEADERS (Required)
+# ------------------------------------------------------------------------------
+template: ingestion_task_metadata
+version: '1.0'
+
+# Unique task identifier following pattern: <source_type>_<entity_or_table_name>
+task_id: example_source_entity
+
+# Human-readable title displayed in data catalogs and monitoring dashboards
+display_name: "Example Source Ingestion Pipeline"
+
+# Business & technical description of the dataset and ingestion logic
+description: "Extracts daily records from upstream source into BigQuery Bronze landing layer."
+
+# Business domain classification (e.g. finance, project_controls, demographics, hydrography, seismic)
+domain: "core_domain"
+
+# Operational status: Active | Inactive | Draft | Template
+# Note: 'Template' and 'Draft' configs are skipped by the DAG Factory.
+metadata_status: Template
+
+
+# ------------------------------------------------------------------------------
+# 2. SOURCE CONFIGURATION
+# ------------------------------------------------------------------------------
+# Choose EITHER Pattern A (Relational/ERP/JDBC) OR Pattern B (REST API/Geospatial/Bulk)
+
+# --- PATTERN A: Relational / ERP / SuiteQL / JDBC ---
+source:
+  type: netsuite                          # Source system identifier: netsuite | p6 | atlas
+  load_type: full_refresh                 # Ingestion strategy: full_refresh | incremental
+  watermark_column: lastmodifieddate      # Field used for incremental delta filtering
+  connection_secret_id: "secret-netsuite-api-config"
+  extraction_type: suiteql                # suiteql | jdbc | arcgis_rest | tabular_api | bulk_download
+  source_table: department
+  primary_key: id
+  where_clause: "ROWNUM <= 10"            # Mandatory NetSuite safety cap (<= 10 records)
+  max_records: 10
+  page_size: 1000                         # Pagination fetch size
+  timeout_seconds: 300                    # Extraction query timeout
+
+# --- PATTERN B: REST API / Geospatial / Bulk Archive ---
+# source:
+#   type: atlas
+#   category: arcgis_rest                 # arcgis_rest | tabular_api | bulk_download
+#   format: geojson_ndjson                # geojson_ndjson | tabular_jsonl
+#   load_type: full_refresh
+#   watermark_column: null
+#   connection:
+#     endpoint_url: "https://example.gov/arcgis/rest/services/.../query"
+#     layer_id: 0
+#     auth_type: none                     # none | secret_manager | api_key
+#     query_params:
+#       where: "1=1"
+#       outFields: "*"
+#       returnGeometry: true
+#     timeout_seconds: 180
+#     max_retries: 5
+
+
+# ------------------------------------------------------------------------------
+# 3. EXECUTION ENGINE CONFIGURATION
+# ------------------------------------------------------------------------------
+# Containerized Cloud Run Ingestion Job
+engine:
+  type: cloud_run_job
+  job_name: suiteql-ingestion             # suiteql-ingestion | jdbc-ingestion | arcgis-ingestion | bulk-ingestion
+  timeout_seconds: 1800
+
+
+# ------------------------------------------------------------------------------
+# 4. DESTINATION CONFIGURATION
+# ------------------------------------------------------------------------------
+destination:
+  # Landing file format: PARQUET | JSONL | CSV
+  format: PARQUET
+
+  # Schema management strategy: static | generic_envelope
+  schema_strategy: static
+
+  # Landing GCS target location
+  gcs_bucket: "bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw"
+  gcs_prefix: "netsuite/raw/netsuite_department/dt={{ ds }}/"
+
+  # Target BigQuery Bronze destination
+  bq_project: "pid-nse-stg-core-apps-k8ti"
+  bq_dataset: "raw_netsuite"        # raw_netsuite | raw_p6 | raw_atlas
+  bq_table: "netsuite_department"
+
+  # BigQuery table write mode: WRITE_TRUNCATE (full refresh) | WRITE_APPEND (incremental)
+  write_disposition: WRITE_TRUNCATE
+
+  # Daily partition column (defaults to ingestion_date added by framework)
+  partition_field: ingestion_date
+
+  # Clustering columns (up to 4 columns for query performance optimization)
+  cluster_fields:
+    - id
+
+
+# ------------------------------------------------------------------------------
+# 5. ORCHESTRATION CONFIGURATION (Airflow / Cloud Composer)
+# ------------------------------------------------------------------------------
+orchestration:
+  # Unique DAG ID in Airflow (standard format: dag_udp_<task_id>)
+  dag_id: dag_udp_example_source_entity
+
+  # Scheduling expression: standard 5-part cron syntax or Airflow preset (@daily, @hourly, @weekly)
+  schedule: "@daily"
+
+  # Historical baseline start date formatted as 'YYYY-MM-DD HH:MM:SS'
+  start_date: "2024-01-01 00:00:00"
+
+  # Prevent backfill runs for past intervals upon DAG activation
+  catchup: false
+
+  # Operational SLAs and retries
+  retries: 2
+  retry_delay_minutes: 5
+  concurrency: 1
+
+  # Categorization tags for filtering in Airflow UI
+  dag_tags:
+    - "source:netsuite"
+    - "engine:cloud_run_job"
+    - "zone:raw"
+
+  # Downstream Dataform Silver transformation configuration
+  dataform:
+    enabled: true
+    target_dataset: "silver_udp"
+    target_table: "stg_netsuite_department"
+    included_tags:
+      - "netsuite"
+      - "netsuite_department"
+    transitive_dependencies_included: false

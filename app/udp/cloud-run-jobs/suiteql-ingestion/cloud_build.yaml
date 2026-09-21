@@ -14,19 +14,19 @@
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    dir: 'app/udp/cloud-run-jobs/suiteQL-ingestion'
+    dir: 'app/udp/cloud-run-jobs/suiteql-ingestion'
     args:
       - 'build'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteQL-ingestion:${SHORT_SHA}'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteql-ingestion:${SHORT_SHA}'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteQL-ingestion:latest'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteql-ingestion:latest'
       - '.'
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - '--all-tags'
-      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteQL-ingestion'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteql-ingestion'
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -34,7 +34,7 @@ steps:
       - 'jobs'
       - 'update'
       - 'suiteql-ingestion'
-      - '--image=${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteQL-ingestion:${SHORT_SHA}'
+      - '--image=${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteql-ingestion:${SHORT_SHA}'
       - '--region=${_REGION}'
       - '--project=${_TARGET_PROJECT_ID}'
 substitutions:
