@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="img"
+     aria-labelledby="net-title" style="font-family:'Google Sans','Inter',-apple-system,sans-serif">
+<title id="net-title">Networking topology: Serverless VPC Access and Cloud NAT static egress versus IAM-authenticated Google API access</title>
+<style>
+.dgm-card{fill:var(--bg);stroke:var(--border-strong);stroke-width:1}
+.dgm-alt{fill:var(--bg-alt);stroke:var(--border);stroke-width:1}
+.dgm-t{font-size:15px;font-weight:600;fill:var(--text)}
+.dgm-s{font-size:12px;fill:var(--text-2)}
+.dgm-m{font-size:11.5px;fill:var(--text-2);font-family:'Roboto Mono',ui-monospace,monospace}
+.dgm-e{font-size:10.5px;font-weight:700;fill:var(--text-3);letter-spacing:.9px}
+.dgm-l{font-size:12px;font-weight:600;fill:var(--text-2)}
+.dgm-flow{fill:none;stroke:var(--border-strong);stroke-width:2}
+.dgm-head{fill:var(--border-strong)}
+.dgm-ic{fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+</style>
+<defs>
+  <marker id="net-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0L10 5L0 10z" class="dgm-head"/>
+  </marker>
+  <clipPath id="net-c1"><rect x="110" y="66" width="300" height="80" rx="10"/></clipPath>
+  <clipPath id="net-c2"><rect x="550" y="66" width="300" height="80" rx="10"/></clipPath>
+  <clipPath id="net-c3"><rect x="110" y="186" width="300" height="80" rx="10"/></clipPath>
+  <clipPath id="net-c4"><rect x="110" y="306" width="300" height="80" rx="10"/></clipPath>
+  <clipPath id="net-c5"><rect x="110" y="520" width="300" height="96" rx="10"/></clipPath>
+  <clipPath id="net-c6"><rect x="550" y="520" width="300" height="96" rx="10"/></clipPath>
+</defs>
+
+<!-- ============ GCP trust boundary ============ -->
+<rect x="60" y="16" width="840" height="430" rx="16"
+      style="fill:var(--gc-blue-light);fill-opacity:.35;stroke:var(--gc-blue-border);stroke-width:1.5;stroke-dasharray:8 6"/>
+<rect x="82" y="6" width="196" height="22" rx="11" style="fill:var(--bg)"/>
+<text x="92" y="22" class="dgm-e" style="fill:var(--gc-blue)">GOOGLE CLOUD PLATFORM · VPC</text>
+
+<!-- Cloud Run Job -->
+<rect x="110" y="66" width="300" height="80" rx="10" class="dgm-card"/>
+<rect x="110" y="66" width="5" height="80" clip-path="url(#net-c1)" style="fill:var(--gc-green)"/>
+<rect x="134" y="86" width="32" height="32" rx="8" style="fill:var(--gc-green);opacity:.14"/>
+<g class="dgm-ic" style="stroke:var(--gc-green)" transform="translate(142,94)">
+  <rect x="1" y="4" width="14" height="9" rx="2.2"/><path d="M4.4 4V2.4M11.6 4V2.4"/>
+</g>
+<text x="180" y="98" class="dgm-t" style="font-size:14px">Cloud Run Jobs</text>
+<text x="180" y="120" class="dgm-s" style="font-size:11.5px">4 ingestion containers</text>
+
+<!-- Cloud Composer -->
+<rect x="550" y="66" width="300" height="80" rx="10" class="dgm-card"/>
+<rect x="550" y="66" width="5" height="80" clip-path="url(#net-c2)" style="fill:var(--gc-blue)"/>
+<rect x="574" y="86" width="32" height="32" rx="8" style="fill:var(--gc-blue);opacity:.14"/>
+<g class="dgm-ic" style="stroke:var(--gc-blue)" transform="translate(582,94)">
+  <circle cx="8" cy="8" r="6.4"/><path d="M8 4.4V8l2.4 2"/>
+</g>
+<text x="620" y="98" class="dgm-t" style="font-size:14px">Cloud Composer</text>
+<text x="620" y="120" class="dgm-s" style="font-size:11.5px">Apache Airflow scheduler</text>
+
+<path d="M260 146V174" class="dgm-flow" marker-end="url(#net-ah)"/>
+
+<!-- Serverless VPC Access -->
+<rect x="110" y="186" width="300" height="80" rx="10" class="dgm-card"/>
+<rect x="110" y="186" width="5" height="80" clip-path="url(#net-c3)" style="fill:var(--gc-purple)"/>
+<rect x="134" y="206" width="32" height="32" rx="8" style="fill:var(--gc-purple);opacity:.14"/>
+<g class="dgm-ic" style="stroke:var(--gc-purple)" transform="translate(142,214)">
+  <circle cx="3.4" cy="8" r="2.4"/><circle cx="12.6" cy="8" r="2.4"/><path d="M5.8 8h4.4"/>
+</g>
+<text x="180" y="218" class="dgm-t" style="font-size:14px">Serverless VPC Access</text>
+<text x="180" y="240" class="dgm-m">cr-conn-us-central1</text>
+
+<path d="M260 266V294" class="dgm-flow" marker-end="url(#net-ah)"/>
+
+<!-- Cloud NAT -->
+<rect x="110" y="306" width="300" height="80" rx="10" class="dgm-card"/>
+<rect x="110" y="306" width="5" height="80" clip-path="url(#net-c4)" style="fill:var(--gc-yellow-dark)"/>
+<rect x="134" y="326" width="32" height="32" rx="8" style="fill:var(--gc-yellow-dark);opacity:.16"/>
+<g class="dgm-ic" style="stroke:var(--gc-yellow-dark)" transform="translate(142,334)">
+  <path d="M1.6 11.4h12.8M8 11.4V4.6M4.6 7.4L8 4.2l3.4 3.2"/>
+</g>
+<text x="180" y="338" class="dgm-t" style="font-size:14px">Cloud NAT gateway</text>
+<text x="180" y="360" class="dgm-s" style="font-size:11.5px">Reserved static egress IP</text>
+
+<!-- ============ egress paths crossing the boundary ============ -->
+<path d="M260 386V508" class="dgm-flow" marker-end="url(#net-ah)"/>
+<path d="M700 146V508" class="dgm-flow" marker-end="url(#net-ah)"/>
+
+<rect x="146" y="456" width="234" height="24" rx="12" style="fill:var(--bg)"/>
+<text x="160" y="473" class="dgm-l">Outbound via static egress IP</text>
+
+<rect x="586" y="456" width="216" height="24" rx="12" style="fill:var(--bg)"/>
+<text x="600" y="473" class="dgm-l">IAM ID token · ADC</text>
+
+<!-- ============ external + Google APIs ============ -->
+<rect x="110" y="520" width="300" height="96" rx="10" class="dgm-card"/>
+<rect x="110" y="520" width="5" height="96" clip-path="url(#net-c5)" style="fill:var(--gc-red)"/>
+<text x="134" y="548" class="dgm-t" style="font-size:14px">NetSuite ERP &amp; Oracle P6</text>
+<text x="134" y="572" class="dgm-s" style="font-size:11.5px">Corporate systems outside Google Cloud</text>
+<rect x="134" y="584" width="200" height="22" rx="11" style="fill:var(--gc-red);fill-opacity:.12"/>
+<text x="146" y="599" class="dgm-s" style="font-size:11px;font-weight:600;fill:var(--gc-red)">Source IP allow-list enforced</text>
+
+<rect x="550" y="520" width="300" height="96" rx="10" class="dgm-card"/>
+<rect x="550" y="520" width="5" height="96" clip-path="url(#net-c6)" style="fill:var(--gc-blue)"/>
+<text x="574" y="548" class="dgm-t" style="font-size:14px">BigQuery · GCS · Secret Manager</text>
+<text x="574" y="572" class="dgm-s" style="font-size:11.5px">Reached over Google&#8217;s private API backbone</text>
+<rect x="574" y="584" width="150" height="22" rx="11" style="fill:var(--gc-blue);fill-opacity:.12"/>
+<text x="586" y="599" class="dgm-s" style="font-size:11px;font-weight:600;fill:var(--gc-blue)">IAM authenticated</text>
+</svg>

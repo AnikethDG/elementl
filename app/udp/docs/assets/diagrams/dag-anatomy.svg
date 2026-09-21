@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" role="img"
+     aria-labelledby="dag-title" style="font-family:'Google Sans','Inter',-apple-system,sans-serif">
+<title id="dag-title">Anatomy of a generated UDP DAG: ingestion_group followed by dataform_group</title>
+<style>
+.dgm-card{fill:var(--bg);stroke:var(--border-strong);stroke-width:1}
+.dgm-alt{fill:var(--bg-alt);stroke:var(--border);stroke-width:1}
+.dgm-group{fill:none;stroke:var(--gc-blue-border);stroke-width:1.5;stroke-dasharray:7 5}
+.dgm-t{font-size:15px;font-weight:600;fill:var(--text)}
+.dgm-s{font-size:12px;fill:var(--text-2)}
+.dgm-m{font-size:11.5px;fill:var(--text-2);font-family:'Roboto Mono',ui-monospace,monospace}
+.dgm-e{font-size:10.5px;font-weight:700;fill:var(--text-3);letter-spacing:.9px}
+.dgm-l{font-size:12px;font-weight:600;fill:var(--text-2)}
+.dgm-flow{fill:none;stroke:var(--border-strong);stroke-width:2}
+.dgm-head{fill:var(--border-strong)}
+.dgm-ic{fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+</style>
+<defs>
+  <marker id="dag-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0L10 5L0 10z" class="dgm-head"/>
+  </marker>
+  <clipPath id="dag-ca"><rect x="152" y="118" width="300" height="88" rx="10"/></clipPath>
+  <clipPath id="dag-cb"><rect x="508" y="118" width="300" height="88" rx="10"/></clipPath>
+  <clipPath id="dag-cc"><rect x="152" y="304" width="300" height="88" rx="10"/></clipPath>
+  <clipPath id="dag-cd"><rect x="508" y="304" width="300" height="88" rx="10"/></clipPath>
+</defs>
+
+<!-- start -->
+<rect x="430" y="16" width="100" height="34" rx="17" class="dgm-alt"/>
+<circle cx="452" cy="33" r="4.5" style="fill:var(--gc-green)"/>
+<text x="466" y="37" class="dgm-s" style="font-weight:600;fill:var(--text)">start</text>
+<path d="M480 50V68" class="dgm-flow" marker-end="url(#dag-ah)"/>
+
+<!-- ============ TaskGroup: ingestion_group ============ -->
+<rect x="120" y="74" width="720" height="150" rx="14" class="dgm-group"/>
+<rect x="140" y="64" width="234" height="22" rx="11" style="fill:var(--bg)"/>
+<text x="150" y="80" class="dgm-e" style="fill:var(--gc-blue)">TASKGROUP · INGESTION_GROUP</text>
+
+<rect x="152" y="118" width="300" height="88" rx="10" class="dgm-card"/>
+<rect x="152" y="118" width="5" height="88" clip-path="url(#dag-ca)" style="fill:var(--gc-blue)"/>
+<text x="176" y="146" class="dgm-t" style="font-size:14px">execute_cloud_run_job</text>
+<text x="176" y="168" class="dgm-m">CloudRunExecuteJobOperator</text>
+<text x="176" y="188" class="dgm-s" style="font-size:11.5px">Async job + container env overrides</text>
+
+<path d="M452 162h44" class="dgm-flow" marker-end="url(#dag-ah)"/>
+
+<rect x="508" y="118" width="300" height="88" rx="10" class="dgm-card"/>
+<rect x="508" y="118" width="5" height="88" clip-path="url(#dag-cb)" style="fill:var(--gc-yellow-dark)"/>
+<text x="532" y="146" class="dgm-t" style="font-size:14px">load_gcs_to_bq_bronze</text>
+<text x="532" y="168" class="dgm-m">GCSToBigQueryOperator</text>
+<text x="532" y="188" class="dgm-s" style="font-size:11.5px">Parquet &#8594; ds_bronze_&lt;source&gt;</text>
+
+<path d="M480 224V254" class="dgm-flow" marker-end="url(#dag-ah)"/>
+
+<!-- ============ TaskGroup: dataform_group ============ -->
+<rect x="120" y="260" width="720" height="150" rx="14" class="dgm-group" style="stroke:var(--gc-green-border)"/>
+<rect x="140" y="250" width="228" height="22" rx="11" style="fill:var(--bg)"/>
+<text x="150" y="266" class="dgm-e" style="fill:var(--gc-green)">TASKGROUP · DATAFORM_GROUP</text>
+
+<rect x="152" y="304" width="300" height="88" rx="10" class="dgm-card"/>
+<rect x="152" y="304" width="5" height="88" clip-path="url(#dag-cc)" style="fill:var(--gc-green)"/>
+<text x="176" y="332" class="dgm-t" style="font-size:14px">compile_dataform</text>
+<text x="176" y="354" class="dgm-m">DataformCreateCompilationResult</text>
+<text x="176" y="374" class="dgm-s" style="font-size:11.5px">git_commitish resolved per environment</text>
+
+<path d="M452 348h44" class="dgm-flow" marker-end="url(#dag-ah)"/>
+
+<rect x="508" y="304" width="300" height="88" rx="10" class="dgm-card"/>
+<rect x="508" y="304" width="5" height="88" clip-path="url(#dag-cd)" style="fill:var(--gc-green)"/>
+<text x="532" y="332" class="dgm-t" style="font-size:14px">invoke_silver_model</text>
+<text x="532" y="354" class="dgm-m">DataformCreateWorkflowInvocation</text>
+<text x="532" y="374" class="dgm-s" style="font-size:11.5px">included_tags: [dataform_tags]</text>
+
+<path d="M480 410V440" class="dgm-flow" marker-end="url(#dag-ah)"/>
+
+<!-- end -->
+<rect x="430" y="446" width="100" height="34" rx="17" class="dgm-alt"/>
+<circle cx="452" cy="463" r="4.5" style="fill:var(--gc-red)"/>
+<text x="466" y="467" class="dgm-s" style="font-weight:600;fill:var(--text)">end</text>
+</svg>

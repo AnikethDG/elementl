@@ -41,6 +41,6 @@ destination:
   gcs_bucket: bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw
   gcs_prefix: netsuite/raw/transactionLine
   bq_project: pid-nse-stg-core-apps-k8ti
-  bq_dataset: raw_netsuite
+  bq_dataset: ds_bronze_netsuite
   bq_table: netsuite_transactionline
   write_disposition: WRITE_TRUNCATE

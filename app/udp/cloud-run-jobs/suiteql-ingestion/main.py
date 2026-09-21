@@ -457,7 +457,7 @@ class NetSuiteExtractor(BaseExtractor):
             try:
                 from google.cloud import bigquery
                 bq_project = config.audit_project or os.environ.get("GCP_PROJECT_ID") or os.environ.get("GCP_PROJECT")
-                bq_dataset = config.target_dataset or "raw_netsuite"
+                bq_dataset = config.target_dataset or "ds_bronze_netsuite"
                 bq_table = config.target_table or f"netsuite_{config.task_id.replace('netsuite_', '')}"
                 if bq_project and gcs_uris[0].endswith(".parquet"):
                     bq_client = bigquery.Client(project=bq_project)

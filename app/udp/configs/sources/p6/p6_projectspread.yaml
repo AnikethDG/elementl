@@ -20,9 +20,9 @@ source_table: PROJECTSPREAD
 primary_key: PROJECTOBJECTID
 watermark_column: STARTDATE
 sample_where_clause: "ROWNUM <= 20"
-target_dataset: raw_p6
+target_dataset: ds_bronze_p6
 target_table: p6_projectspread
-silver_dataset: silver_p6
+silver_dataset: ds_silver_p6
 silver_table: stg_p6_projectspread
 dataform_tags:
   - p6

@@ -34,7 +34,7 @@ destination:
   gcs_bucket: bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw
   gcs_prefix: atlas/raw/S1-07
   bq_project: pid-nse-stg-core-apps-k8ti
-  bq_dataset: raw_atlas
+  bq_dataset: ds_bronze_atlas
   bq_table: seismic_pga_usgs_nshm_2023
   envelope_table: atlas_raw_envelope
   write_disposition: WRITE_TRUNCATE

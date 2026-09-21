@@ -19,9 +19,9 @@ source_table: vendor
 primary_key: id
 watermark_column: lastmodifieddate
 sample_where_clause: "ROWNUM <= 20"
-target_dataset: raw_netsuite
+target_dataset: ds_bronze_netsuite
 target_table: netsuite_vendor
-silver_dataset: silver_netsuite
+silver_dataset: ds_silver_netsuite
 silver_table: stg_netsuite_vendor
 dataform_tags:
   - netsuite

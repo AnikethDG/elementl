@@ -1,0 +1,13 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/pid-nse-stg-core-apps-k8ti/udp-ingestion-jobs/arcgis-ingestion:latest', '-f', 'arcgis-ingestion/Dockerfile', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/pid-nse-stg-core-apps-k8ti/udp-ingestion-jobs/suiteql-ingestion:latest', '-f', 'suiteql-ingestion/Dockerfile', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/pid-nse-stg-core-apps-k8ti/udp-ingestion-jobs/jdbc-ingestion:latest', '-f', 'jdbc-ingestion/Dockerfile', '.']
+images:
+  - 'us-central1-docker.pkg.dev/pid-nse-stg-core-apps-k8ti/udp-ingestion-jobs/arcgis-ingestion:latest'
+  - 'us-central1-docker.pkg.dev/pid-nse-stg-core-apps-k8ti/udp-ingestion-jobs/suiteql-ingestion:latest'
+  - 'us-central1-docker.pkg.dev/pid-nse-stg-core-apps-k8ti/udp-ingestion-jobs/jdbc-ingestion:latest'
+options:
+  machineType: 'E2_HIGHCPU_8'

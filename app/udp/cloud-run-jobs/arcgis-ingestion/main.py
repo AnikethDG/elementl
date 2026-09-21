@@ -22,8 +22,8 @@ Supports:
            Replaces discontinued NASA HIFLD Hospitals endpoint.
 
 Writes extracted GeoJSON features to GCS Parquet/JSONL and loads both the
-standardized Bronze envelope table (`raw_atlas.atlas_raw_envelope`) and per-layer
-BigQuery Bronze tables (`raw_atlas.<target_table>`).
+standardized Bronze envelope table (`ds_bronze_atlas.atlas_raw_envelope`) and per-layer
+BigQuery Bronze tables (`ds_bronze_atlas.<target_table>`).
 """
 
 import datetime
@@ -138,7 +138,7 @@ class ArcGisExtractor(BaseExtractor):
             try:
                 from google.cloud import bigquery
                 bq_project = config.audit_project or os.environ.get("GCP_PROJECT_ID") or os.environ.get("GCP_PROJECT")
-                bq_dataset = config.target_dataset or "raw_atlas"
+                bq_dataset = config.target_dataset or "ds_bronze_atlas"
                 if bq_project and gcs_uris[0].endswith(".parquet"):
                     bq_client = bigquery.Client(project=bq_project)
                     for tbl in {layer_name, "atlas_raw_envelope"}:

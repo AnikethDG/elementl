@@ -15,6 +15,19 @@
 # Consolidated Project BigQuery Datasets (Bronze, Silver, Gold, Assertions, Metadata)
 locals {
   udp_datasets = {
+    # Standardized Naming Convention Datasets (Elementl UDP Naming Convention Doc + Per-Source Silver Split)
+    ds_bronze_p6           = "Bronze raw landing dataset for Oracle Primavera P6 (ELEMENTL_PMDB_SBOX_PXRPTUSER)"
+    ds_bronze_netsuite     = "Bronze raw landing dataset for Oracle NetSuite (SuiteQL 11 tables)"
+    ds_bronze_atlas        = "Bronze raw landing dataset for Atlas GIS & Tabular (envelope schema + layers)"
+    ds_silver_p6           = "Silver 1:1 cleansed & standardized models for Oracle Primavera P6"
+    ds_silver_netsuite     = "Silver 1:1 cleansed & standardized models for Oracle NetSuite"
+    ds_silver_atlas        = "Silver 1:1 cleansed & standardized models for Atlas GIS & Tabular"
+    ds_gold                = "Gold conformed & curated business data models and executive views"
+    ds_dataform_assertions = "Dataform data quality assertions failed records (Bronze-to-Silver validation)"
+    ds_operations          = "Operational metadata table driving DAG Factory, watermarks, and framework audit logs"
+    ds_atlas_analytics     = "Exposed analytics views, site suitability parameters, and AI search tables for Project Atlas"
+
+    # Legacy / Retained Datasets (preserved in state to avoid destructive replacement)
     raw_p6              = "Bronze raw landing dataset for Oracle Primavera P6 (ELEMENTL_PMDB_SBOX_PXRPTUSER)"
     raw_netsuite        = "Bronze raw landing dataset for Oracle NetSuite (SuiteQL 11 tables)"
     raw_atlas           = "Bronze raw landing dataset for Atlas GIS & Tabular (envelope schema + layers)"

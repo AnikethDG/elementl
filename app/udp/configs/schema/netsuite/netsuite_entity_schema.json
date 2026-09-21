@@ -1,0 +1,127 @@
+[
+  {
+    "name": "altname",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "contact",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "customer",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "datecreated",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "employee",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "entityid",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "entitytitle",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "fullname",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "globalsubscriptionstatus",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "group",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "id",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "isinactive",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "isperson",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "isunavailable",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "lastmodifieddate",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "othername",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "partner",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "project",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "subsidiary",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "toplevelparent",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "type",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "unsubscribe",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "vendor",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "ingestion_date",
+    "type": "DATE",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "ingestion_timestamp",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE"
+  }
+]

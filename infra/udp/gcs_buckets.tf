@@ -50,3 +50,40 @@ resource "google_storage_bucket" "udp_bronze_archive" {
     enabled = true
   }
 }
+
+resource "google_storage_bucket" "udp_landing_staging" {
+  project                     = var.project_id
+  name                        = "bkt-${var.project_id}-udp-landing-staging"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = false
+
+  lifecycle_rule {
+    action {
+      type = "Delete"
+    }
+    condition {
+      age = 7
+    }
+  }
+}
+
+resource "google_storage_bucket" "udp_dataflow_temp" {
+  project                     = var.project_id
+  name                        = "bkt-${var.project_id}-udp-dataflow-temp"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = false
+
+  lifecycle_rule {
+    action {
+      type = "Delete"
+    }
+    condition {
+      age = 7
+    }
+  }
+}
+

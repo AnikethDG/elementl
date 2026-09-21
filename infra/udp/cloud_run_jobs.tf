@@ -16,28 +16,36 @@
 locals {
   ingestion_jobs = {
     "arcgis-ingestion" = {
-      description = "Atlas ArcGIS MapServer / FeatureServer REST ingestion worker (S1-02 Substations, S1-06 USGS Qfaults, S2-10 FEMA RAPT Hospitals)"
-      cpu         = "2"
-      memory      = "4Gi"
-      source_type = "ARCGIS"
+      description    = "Atlas ArcGIS MapServer / FeatureServer REST ingestion worker (S1-02 Substations, S1-06 USGS Qfaults, S2-10 FEMA RAPT Hospitals)"
+      cpu            = "2"
+      memory         = "4Gi"
+      source_type    = "ARCGIS"
+      bronze_dataset = "ds_bronze_atlas"
+      silver_dataset = "ds_silver_atlas"
     }
     "bulk-ingestion" = {
-      description = "Atlas bulk shapefile/zip download, unpacking, and tabular API ingestion worker (S1-01 USGS Streamflow, S2-20 Census, S1-07 USGS NSHM)"
-      cpu         = "2"
-      memory      = "4Gi"
-      source_type = "BULK"
+      description    = "Atlas bulk shapefile/zip download, unpacking, and tabular API ingestion worker (S1-01 USGS Streamflow, S2-20 Census, S1-07 USGS NSHM)"
+      cpu            = "2"
+      memory         = "4Gi"
+      source_type    = "BULK"
+      bronze_dataset = "ds_bronze_atlas"
+      silver_dataset = "ds_silver_atlas"
     }
     "suiteql-ingestion" = {
-      description = "Oracle NetSuite OAuth 2.0 M2M JWT SuiteQL REST API ingestion worker (11 tables)"
-      cpu         = "2"
-      memory      = "4Gi"
-      source_type = "SUITEQL"
+      description    = "Oracle NetSuite OAuth 2.0 M2M JWT SuiteQL REST API ingestion worker (11 tables)"
+      cpu            = "2"
+      memory         = "4Gi"
+      source_type    = "SUITEQL"
+      bronze_dataset = "ds_bronze_netsuite"
+      silver_dataset = "ds_silver_netsuite"
     }
     "jdbc-ingestion" = {
-      description = "Oracle Primavera P6 TCPS 2484 JDBC/oracledb ingestion worker (ELEMENTL_PMDB_SBOX_PXRPTUSER)"
-      cpu         = "2"
-      memory      = "4Gi"
-      source_type = "JDBC_P6"
+      description    = "Oracle Primavera P6 TCPS 2484 JDBC/oracledb ingestion worker (ELEMENTL_PMDB_SBOX_PXRPTUSER)"
+      cpu            = "2"
+      memory         = "4Gi"
+      source_type    = "JDBC_P6"
+      bronze_dataset = "ds_bronze_p6"
+      silver_dataset = "ds_silver_p6"
     }
   }
 
@@ -121,6 +129,18 @@ resource "google_cloud_run_v2_job" "udp_ingestion_jobs" {
           value = google_storage_bucket.udp_bronze_archive.name
         }
         env {
+          name  = "STAGING_BUCKET"
+          value = google_storage_bucket.udp_landing_staging.name
+        }
+        env {
+          name  = "BRONZE_DATASET"
+          value = each.value.bronze_dataset
+        }
+        env {
+          name  = "SILVER_DATASET"
+          value = each.value.silver_dataset
+        }
+        env {
           name  = "SOURCE_TYPE"
           value = each.value.source_type
         }
@@ -166,8 +186,9 @@ resource "google_secret_manager_secret_iam_member" "jdbc_p6_ca_access" {
 }
 
 resource "google_bigquery_dataset_iam_member" "jdbc_p6_raw_dataset_access" {
+  for_each   = toset(["ds_bronze_p6", "raw_p6", "ds_operations"])
   project    = var.project_id
-  dataset_id = google_bigquery_dataset.datasets["raw_p6"].dataset_id
+  dataset_id = google_bigquery_dataset.datasets[each.key].dataset_id
   role       = "roles/bigquery.dataEditor"
   member     = "serviceAccount:${google_service_account.udp_job_sa["jdbc-ingestion"].email}"
 }
@@ -181,24 +202,28 @@ resource "google_secret_manager_secret_iam_member" "suiteql_netsuite_secrets_acc
 }
 
 resource "google_bigquery_dataset_iam_member" "suiteql_netsuite_raw_dataset_access" {
+  for_each   = toset(["ds_bronze_netsuite", "raw_netsuite", "ds_operations"])
   project    = var.project_id
-  dataset_id = google_bigquery_dataset.datasets["raw_netsuite"].dataset_id
+  dataset_id = google_bigquery_dataset.datasets[each.key].dataset_id
   role       = "roles/bigquery.dataEditor"
   member     = "serviceAccount:${google_service_account.udp_job_sa["suiteql-ingestion"].email}"
 }
 
 resource "google_bigquery_dataset_iam_member" "arcgis_atlas_raw_dataset_access" {
+  for_each   = toset(["ds_bronze_atlas", "raw_atlas", "ds_operations"])
   project    = var.project_id
-  dataset_id = google_bigquery_dataset.datasets["raw_atlas"].dataset_id
+  dataset_id = google_bigquery_dataset.datasets[each.key].dataset_id
   role       = "roles/bigquery.dataEditor"
   member     = "serviceAccount:${google_service_account.udp_job_sa["arcgis-ingestion"].email}"
 }
 
 resource "google_bigquery_dataset_iam_member" "bulk_atlas_raw_dataset_access" {
+  for_each   = toset(["ds_bronze_atlas", "raw_atlas", "ds_operations"])
   project    = var.project_id
-  dataset_id = google_bigquery_dataset.datasets["raw_atlas"].dataset_id
+  dataset_id = google_bigquery_dataset.datasets[each.key].dataset_id
   role       = "roles/bigquery.dataEditor"
   member     = "serviceAccount:${google_service_account.udp_job_sa["bulk-ingestion"].email}"
 }
+
 
 

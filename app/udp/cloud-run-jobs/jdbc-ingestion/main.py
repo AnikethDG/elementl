@@ -35,7 +35,7 @@ from google.cloud import bigquery, secretmanager, storage
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("jdbc-ingestion")
 
-# Canonical table mapping: Source P6 Reporting View/Table -> (GCS folder slug, BigQuery raw_p6 table name)
+# Canonical table mapping: Source P6 Reporting View/Table -> (GCS folder slug, BigQuery ds_bronze_p6 table name)
 DEFAULT_P6_TABLE_MAP: dict[str, tuple[str, str]] = {
     "PROJECT": ("projects", "p6_projects"),
     "WBS": ("wbs", "p6_wbs"),
@@ -167,7 +167,7 @@ def main() -> int:
     raw_bucket_name = os.environ.get("RAW_BUCKET_NAME", f"bkt-{project_id}-udp-bronze-raw")
     preferred_schema = os.environ.get("P6_SCHEMA", "ELEMENTL_PMDB_SBOX_PXRPTUSER")
     row_limit = int(os.environ.get("ROW_LIMIT", "20"))
-    bq_dataset = os.environ.get("BQ_BRONZE_DATASET", "raw_p6")
+    bq_dataset = os.environ.get("BQ_BRONZE_DATASET", "ds_bronze_p6")
 
     try:
         egress_ip = requests.get("https://api.ipify.org", timeout=5).text.strip()
@@ -281,7 +281,7 @@ def main() -> int:
             blob = bucket.blob(gcs_object_path)
             blob.upload_from_string(parquet_bytes, content_type="application/octet-stream")
 
-            # 2. Load into BigQuery Native Bronze Dataset (raw_p6)
+            # 2. Load into BigQuery Native Bronze Dataset (ds_bronze_p6)
             bq_loaded = ensure_and_populate_bq_table(
                 bq_client=bq_client,
                 project_id=project_id,

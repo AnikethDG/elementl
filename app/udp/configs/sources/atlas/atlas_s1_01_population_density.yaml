@@ -18,9 +18,9 @@ layer_id: "S1-01"
 ingestion_job: bulk-ingestion
 endpoint_url: "https://www2.census.gov/geo/tiger/TIGER2024/"
 unpack_zip_to_envelope_schema: true
-target_dataset: raw_atlas
+target_dataset: ds_bronze_atlas
 target_table: atlas_s1_01_population_density
-silver_dataset: silver_atlas
+silver_dataset: ds_silver_atlas
 silver_table: stg_atlas_s1_01_population_density
 dataform_tags:
   - atlas

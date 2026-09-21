@@ -1,0 +1,107 @@
+[
+  {
+    "name": "accountsearchdisplayname",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "accountsearchdisplaynamecopy",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "acctnumber",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "accttype",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "balance",
+    "type": "NUMERIC",
+    "mode": "NULLABLE",
+    "description": "Balance"
+  },
+  {
+    "name": "custrecord_cash360_exclude_account",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE",
+    "description": "Exclude from Cash 360"
+  },
+  {
+    "name": "displaynamewithhierarchy",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "externalid",
+    "type": "NUMERIC",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "fullname",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Internal ID"
+  },
+  {
+    "name": "includechildren",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "inventory",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE",
+    "description": "Inventory"
+  },
+  {
+    "name": "isinactive",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "issummary",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "lastmodifieddate",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "reconcilewithmatching",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "revalue",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE",
+    "description": "Revalue Open Balance for Foreign Currency Transactions"
+  },
+  {
+    "name": "subsidiary",
+    "type": "JSON",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "ingestion_date",
+    "type": "DATE",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "ingestion_timestamp",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE"
+  }
+]

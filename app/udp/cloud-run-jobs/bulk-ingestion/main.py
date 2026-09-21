@@ -23,7 +23,7 @@ Supports:
 Downloads, unpacks (when zip/shapefile archive), normalizes into the standardized
 Bronze envelope schema (`ingestion_id`, `source_id`, `layer_name`, `source_url`,
 `ingested_at`, `geometry_json`, `attributes_json`), writes Parquet to GCS, and
-loads into BigQuery `raw_atlas`.
+loads into BigQuery `ds_bronze_atlas`.
 """
 
 import datetime
@@ -179,7 +179,7 @@ class BulkAtlasExtractor(BaseExtractor):
             try:
                 from google.cloud import bigquery
                 bq_project = config.audit_project or os.environ.get("GCP_PROJECT_ID") or os.environ.get("GCP_PROJECT")
-                bq_dataset = config.target_dataset or "raw_atlas"
+                bq_dataset = config.target_dataset or "ds_bronze_atlas"
                 if bq_project and gcs_uris[0].endswith(".parquet"):
                     bq_client = bigquery.Client(project=bq_project)
                     for tbl in {layer_name, "atlas_raw_envelope"}:

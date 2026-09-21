@@ -60,3 +60,20 @@ resource "google_composer_environment" "udp_composer" {
     }
   }
 }
+
+# Standardized UDP Platform Service Accounts (per Elementl UDP Naming Convention Doc)
+locals {
+  udp_platform_service_accounts = {
+    "gcp-sa-nsedusc1-data-ingest"    = "UDP Ingestion Pipeline Execution Service Account"
+    "gcp-sa-nsedusc1-data-transform" = "UDP Dataform Transformation (Bronze -> Silver -> Gold) Service Account"
+    "gcp-sa-nsedusc1-composer"       = "UDP Cloud Composer Orchestration Service Account"
+  }
+}
+
+resource "google_service_account" "udp_platform_sas" {
+  for_each     = local.udp_platform_service_accounts
+  project      = var.project_id
+  account_id   = each.key
+  display_name = each.value
+}
+

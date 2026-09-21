@@ -101,7 +101,7 @@ destination:
 
   # Target BigQuery Bronze destination
   bq_project: "pid-nse-stg-core-apps-k8ti"
-  bq_dataset: "raw_netsuite"        # raw_netsuite | raw_p6 | raw_atlas
+  bq_dataset: "ds_bronze_netsuite"        # ds_bronze_netsuite | ds_bronze_p6 | ds_bronze_atlas
   bq_table: "netsuite_department"
 
   # BigQuery table write mode: WRITE_TRUNCATE (full refresh) | WRITE_APPEND (incremental)

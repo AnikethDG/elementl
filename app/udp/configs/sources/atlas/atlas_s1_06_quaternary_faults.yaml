@@ -18,9 +18,9 @@ layer_id: "S1-06"
 ingestion_job: arcgis-ingestion
 endpoint_url: "https://earthquake.usgs.gov/arcgis/rest/services/haz/Qfaults/MapServer"
 unpack_zip_to_envelope_schema: true
-target_dataset: raw_atlas
+target_dataset: ds_bronze_atlas
 target_table: atlas_s1_06_quaternary_faults
-silver_dataset: silver_atlas
+silver_dataset: ds_silver_atlas
 silver_table: stg_atlas_s1_06_quaternary_faults
 dataform_tags:
   - atlas

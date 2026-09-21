@@ -18,9 +18,9 @@ layer_id: "S2-20"
 ingestion_job: bulk-ingestion
 endpoint_url: "https://waterservices.usgs.gov/"
 unpack_zip_to_envelope_schema: true
-target_dataset: raw_atlas
+target_dataset: ds_bronze_atlas
 target_table: atlas_s2_20_cooling_water_supply
-silver_dataset: silver_atlas
+silver_dataset: ds_silver_atlas
 silver_table: stg_atlas_s2_20_cooling_water_supply
 dataform_tags:
   - atlas
