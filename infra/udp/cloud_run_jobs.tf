@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Instantiate the 4 Containerized Ingestion Cloud Run Jobs via Reusable Module
+# Instantiate the 4 Containerized Ingestion Cloud Run Jobs directly (without a separate Terraform module)
 locals {
   ingestion_jobs = {
     "arcgis-ingestion" = {
@@ -52,30 +52,101 @@ locals {
   ])
 }
 
-module "udp_cloud_run_jobs" {
-  source   = "../modules/cloud-run-jobs"
+resource "google_service_account" "udp_job_sa" {
+  for_each     = local.ingestion_jobs
+  project      = var.project_id
+  account_id   = substr("sa-${each.key}", 0, 28)
+  display_name = "UDP Runtime SA for ${each.key}"
+  description  = "Dedicated least-privilege service account for Cloud Run Job ${each.key}"
+}
+
+resource "google_storage_bucket_iam_member" "udp_job_raw_bucket_access" {
   for_each = local.ingestion_jobs
+  bucket   = google_storage_bucket.udp_bronze_raw.name
+  role     = "roles/storage.objectAdmin"
+  member   = "serviceAccount:${google_service_account.udp_job_sa[each.key].email}"
+}
 
-  project_id      = var.project_id
-  region          = var.region
-  job_name        = each.key
-  description     = each.value.description
-  cpu             = each.value.cpu
-  memory          = each.value.memory
-  vpc_network     = var.vpc_network
-  vpc_subnet      = var.vpc_subnet
-  raw_bucket_name = google_storage_bucket.udp_bronze_raw.name
+resource "google_cloud_run_v2_job" "udp_ingestion_jobs" {
+  for_each = local.ingestion_jobs
+  project  = var.project_id
+  name     = each.key
+  location = var.region
 
-  env_vars = {
-    GCP_PROJECT_ID                = var.project_id
-    GCP_PROJECT                   = var.project_id
-    ENVIRONMENT                   = var.environment
-    RAW_BUCKET_NAME               = google_storage_bucket.udp_bronze_raw.name
-    ARCHIVE_BUCKET                = google_storage_bucket.udp_bronze_archive.name
-    SOURCE_TYPE                   = each.value.source_type
-    P6_SCHEMA                     = "ELEMENTL_PMDB_SBOX_PXRPTUSER"
-    NETSUITE_PRIVATE_KEY_SECRET_ID = "secret-netsuite-private-key"
-    NETSUITE_SCOPE                = "rest_webservices"
+  template {
+    template {
+      service_account = google_service_account.udp_job_sa[each.key].email
+      max_retries     = 2
+      timeout         = "3600s"
+
+      dynamic "vpc_access" {
+        for_each = var.vpc_subnet != "" ? [1] : []
+        content {
+          egress = "ALL_TRAFFIC"
+          network_interfaces {
+            network    = var.vpc_network != "" ? var.vpc_network : null
+            subnetwork = var.vpc_subnet
+          }
+        }
+      }
+
+      containers {
+        image = "us-docker.pkg.dev/cloudrun/container/job:latest"
+
+        resources {
+          limits = {
+            cpu    = each.value.cpu
+            memory = each.value.memory
+          }
+        }
+
+        env {
+          name  = "GCP_PROJECT_ID"
+          value = var.project_id
+        }
+        env {
+          name  = "GCP_PROJECT"
+          value = var.project_id
+        }
+        env {
+          name  = "ENVIRONMENT"
+          value = var.environment
+        }
+        env {
+          name  = "RAW_BUCKET_NAME"
+          value = google_storage_bucket.udp_bronze_raw.name
+        }
+        env {
+          name  = "ARCHIVE_BUCKET"
+          value = google_storage_bucket.udp_bronze_archive.name
+        }
+        env {
+          name  = "SOURCE_TYPE"
+          value = each.value.source_type
+        }
+        env {
+          name  = "P6_SCHEMA"
+          value = "ELEMENTL_PMDB_SBOX_PXRPTUSER"
+        }
+        env {
+          name  = "NETSUITE_PRIVATE_KEY_SECRET_ID"
+          value = "secret-netsuite-private-key"
+        }
+        env {
+          name  = "NETSUITE_SCOPE"
+          value = "rest_webservices"
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    # Prevent config drift when Cloud Build updates container image digests
+    ignore_changes = [
+      template[0].template[0].containers[0].image,
+      client,
+      client_version,
+    ]
   }
 }
 
@@ -84,21 +155,21 @@ resource "google_secret_manager_secret_iam_member" "jdbc_p6_config_access" {
   project   = var.project_id
   secret_id = google_secret_manager_secret.udp_secrets["secret-p6-db-config"].secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${module.udp_cloud_run_jobs["jdbc-ingestion"].service_account_email}"
+  member    = "serviceAccount:${google_service_account.udp_job_sa["jdbc-ingestion"].email}"
 }
 
 resource "google_secret_manager_secret_iam_member" "jdbc_p6_ca_access" {
   project   = var.project_id
   secret_id = google_secret_manager_secret.udp_secrets["secret-p6-db-ca-bundle"].secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${module.udp_cloud_run_jobs["jdbc-ingestion"].service_account_email}"
+  member    = "serviceAccount:${google_service_account.udp_job_sa["jdbc-ingestion"].email}"
 }
 
 resource "google_bigquery_dataset_iam_member" "jdbc_p6_raw_dataset_access" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.datasets["raw_p6"].dataset_id
   role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${module.udp_cloud_run_jobs["jdbc-ingestion"].service_account_email}"
+  member     = "serviceAccount:${google_service_account.udp_job_sa["jdbc-ingestion"].email}"
 }
 
 resource "google_secret_manager_secret_iam_member" "suiteql_netsuite_secrets_access" {
@@ -106,27 +177,28 @@ resource "google_secret_manager_secret_iam_member" "suiteql_netsuite_secrets_acc
   project   = var.project_id
   secret_id = google_secret_manager_secret.udp_secrets[each.key].secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${module.udp_cloud_run_jobs["suiteql-ingestion"].service_account_email}"
+  member    = "serviceAccount:${google_service_account.udp_job_sa["suiteql-ingestion"].email}"
 }
 
 resource "google_bigquery_dataset_iam_member" "suiteql_netsuite_raw_dataset_access" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.datasets["raw_netsuite"].dataset_id
   role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${module.udp_cloud_run_jobs["suiteql-ingestion"].service_account_email}"
+  member     = "serviceAccount:${google_service_account.udp_job_sa["suiteql-ingestion"].email}"
 }
 
 resource "google_bigquery_dataset_iam_member" "arcgis_atlas_raw_dataset_access" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.datasets["raw_atlas"].dataset_id
   role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${module.udp_cloud_run_jobs["arcgis-ingestion"].service_account_email}"
+  member     = "serviceAccount:${google_service_account.udp_job_sa["arcgis-ingestion"].email}"
 }
 
 resource "google_bigquery_dataset_iam_member" "bulk_atlas_raw_dataset_access" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.datasets["raw_atlas"].dataset_id
   role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${module.udp_cloud_run_jobs["bulk-ingestion"].service_account_email}"
+  member     = "serviceAccount:${google_service_account.udp_job_sa["bulk-ingestion"].email}"
 }
+
 
