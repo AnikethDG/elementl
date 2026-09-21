@@ -210,12 +210,11 @@ def main() -> None:
         f"""
         CREATE OR REPLACE VIEW `{PROJECT_ID}.ds_gold.vw_project_schedule_and_budget_summary` AS
         SELECT
-          p.PROJ_ID AS p6_project_id,
-          p.PROJ_SHORT_NAME AS p6_project_code,
           b.subsidiary_id,
           b.accounting_period,
           b.budget_amount_usd,
-          p._silver_processed_ts AS p6_silver_synced_ts
+          p._silver_processed_ts AS p6_silver_synced_ts,
+          TO_JSON_STRING(p) AS p6_project_record_json
         FROM `{PROJECT_ID}.ds_silver_p6.stg_p6_project` p
         CROSS JOIN `{PROJECT_ID}.ds_silver_netsuite.stg_netsuite_budgets` b
         """,
