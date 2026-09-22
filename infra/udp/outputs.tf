@@ -12,40 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-output "artifact_registry_repository_url" {
-  description = "Docker Artifact Registry repository URL for the 4 Cloud Run Jobs in apps/udp/cloud-run-jobs/"
-  value       = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.udp_ingestion_repo.repository_id}"
+output "udp_bronze_raw_bucket" {
+  description = "Bronze raw landing GCS bucket name"
+  value       = google_storage_bucket.udp_bronze_raw.name
 }
 
-output "cloud_run_job_names" {
-  description = "Provisioned Cloud Run v2 Job names for UDP ingestion"
-  value       = [for k, v in google_cloud_run_v2_job.udp_ingestion_jobs : v.name]
+output "udp_bronze_archive_bucket" {
+  description = "Bronze cold archive GCS bucket name"
+  value       = google_storage_bucket.udp_bronze_archive.name
 }
 
-output "cloud_run_job_images" {
-  description = "Expected Artifact Registry Docker image URIs for each Cloud Run Job"
-  value = {
-    for k, v in local.ingestion_jobs :
-    k => "${local.artifact_registry_base_uri}/${k}:${var.image_tag}"
-  }
+output "udp_landing_staging_bucket" {
+  description = "Landing staging GCS bucket name"
+  value       = google_storage_bucket.udp_landing_staging.name
 }
 
-output "bigquery_dataset_ids" {
-  description = "Standardized BigQuery dataset IDs provisioned for UDP"
+output "udp_dataflow_temp_bucket" {
+  description = "Dataflow temporary execution GCS bucket name"
+  value       = google_storage_bucket.udp_dataflow_temp.name
+}
+
+output "udp_bigquery_datasets" {
+  description = "Provisioned BigQuery ingestion dataset IDs"
   value       = [for k, v in google_bigquery_dataset.datasets : v.dataset_id]
 }
 
-output "gcs_bucket_names" {
-  description = "Provisioned GCS bucket names for UDP landing, staging, raw, archive, and Dataflow temp"
-  value = {
-    landing_staging = google_storage_bucket.udp_landing_staging.name
-    dataflow_temp   = google_storage_bucket.udp_dataflow_temp.name
-    bronze_raw      = google_storage_bucket.udp_bronze_raw.name
-    bronze_archive  = google_storage_bucket.udp_bronze_archive.name
-  }
+output "udp_cloud_run_jobs" {
+  description = "Provisioned Cloud Run v2 Ingestion Jobs"
+  value       = { for k, j in google_cloud_run_v2_job.udp_ingestion_jobs : k => j.id }
 }
 
-output "dataform_repository_id" {
-  description = "GCP Dataform repository name for Bronze -> Silver -> Gold transformations"
-  value       = google_dataform_repository.udp_dataform_repo.name
+output "udp_job_service_accounts" {
+  description = "Dedicated service accounts for Cloud Run Ingestion Jobs"
+  value       = { for k, sa in google_service_account.udp_job_sa : k => sa.email }
 }

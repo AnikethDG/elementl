@@ -12,108 +12,85 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Cloud Composer 3 Medium Environment (Composer 3 + Airflow 3) & Secret Manager Declarations
-resource "google_secret_manager_secret" "udp_secrets" {
-  for_each = toset([
-    "secret-p6-db-config",
-    "secret-p6-db-ca-bundle",
-    "secret-p6-api-username",
-    "secret-p6-api-password",
-    "secret-netsuite-config",
-    "secret-netsuite-api-config",
-    "secret-netsuite-account-id",
-    "secret-netsuite-client-id",
-    "secret-netsuite-certificate-id",
-    "secret-netsuite-scope",
-    "secret-netsuite-private-key",
-  ])
-
-  project   = var.project_id
-  secret_id = each.key
-
-  replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
-  }
-}
-
-# Standardized UDP Platform Service Accounts (per Elementl UDP Naming Convention Doc)
+# Platform Service Accounts for Ingestion, Transformation, and Orchestration
 locals {
-  udp_platform_service_accounts = {
-    "gcp-sa-nsedusc1-data-ingest"    = "UDP Ingestion Pipeline Execution Service Account"
-    "gcp-sa-nsedusc1-data-transform" = "UDP Dataform Transformation (Bronze -> Silver -> Gold) Service Account"
+  platform_service_accounts = {
+    "gcp-sa-nsedusc1-data-ingest"    = "UDP Data Ingestion Platform Service Account"
+    "gcp-sa-nsedusc1-data-transform" = "UDP Data Transformation (Dataform) Platform Service Account"
     "gcp-sa-nsedusc1-composer"       = "UDP Cloud Composer 3 Orchestration Service Account"
   }
 }
 
 resource "google_service_account" "udp_platform_sas" {
-  for_each     = local.udp_platform_service_accounts
+  for_each     = local.platform_service_accounts
   project      = var.project_id
   account_id   = each.key
   display_name = each.value
 }
 
-# Cloud Composer 3 Medium Environment running Composer 3 + Apache Airflow 3
+# Cloud Composer 3 Environment (Small Instance, Composer 3 + Airflow 3, Private IP)
 resource "google_composer_environment" "udp_composer" {
-  provider = google-beta
-  count    = var.enable_composer ? 1 : 0
-  project  = var.project_id
-  name     = "composer-udp-${var.environment}"
-  region   = var.region
+  count   = var.enable_composer ? 1 : 0
+  project = var.project_id
+  name    = "composer-elementl-udp-${var.environment}"
+  region  = var.region
 
   config {
-    environment_size = "ENVIRONMENT_SIZE_MEDIUM"
-
     software_config {
-      # Cloud Composer 3 with Apache Airflow 3 (e.g., composer-3-airflow-3)
       image_version = var.composer_image_version
+
+      pypi_packages = {
+        "oracledb"     = ""
+        "pyarrow"      = ""
+        "cryptography" = ""
+        "PyJWT"        = ""
+      }
 
       env_variables = {
         GCP_PROJECT_ID         = var.project_id
         GCP_REGION             = var.region
         ENVIRONMENT            = var.environment
         RAW_BUCKET_NAME        = google_storage_bucket.udp_bronze_raw.name
-        STAGING_BUCKET         = google_storage_bucket.udp_landing_staging.name
-        ARCHIVE_BUCKET         = google_storage_bucket.udp_bronze_archive.name
-        P6_SCHEMA              = "ELEMENTL_PMDB_SBOX_PXRPTUSER"
-        DATAFORM_REPOSITORY_ID = google_dataform_repository.udp_dataform_repo.name
-        ARTIFACT_REGISTRY_URI  = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.udp_ingestion_repo.repository_id}"
+        ARCHIVE_BUCKET_NAME    = google_storage_bucket.udp_bronze_archive.name
+        STAGING_BUCKET_NAME    = google_storage_bucket.udp_landing_staging.name
+        DATAFLOW_TEMP_BUCKET   = google_storage_bucket.udp_dataflow_temp.name
+        DATAFORM_REPOSITORY_ID = "gcp-dataform-transformations"
       }
     }
 
+    environment_size = "ENVIRONMENT_SIZE_SMALL"
+
     workloads_config {
       scheduler {
-        cpu        = 2
-        memory_gb  = 4
-        storage_gb = 2
-        count      = 2
+        cpu        = 0.5
+        memory_gb  = 2
+        storage_gb = 1
+        count      = 1
       }
       web_server {
-        cpu        = 2
-        memory_gb  = 4
-        storage_gb = 2
+        cpu        = 0.5
+        memory_gb  = 2
+        storage_gb = 1
       }
       worker {
-        cpu        = 2
-        memory_gb  = 8
-        storage_gb = 10
-        min_count  = 2
-        max_count  = 6
+        cpu        = 0.5
+        memory_gb  = 2
+        storage_gb = 1
+        min_count  = 1
+        max_count  = 3
       }
       triggerer {
-        cpu       = 1
-        memory_gb = 2
-        count     = 2
+        cpu       = 0.5
+        memory_gb = 1
+        count     = 1
       }
     }
 
     node_config {
-      service_account = google_service_account.udp_platform_sas["gcp-sa-nsedusc1-composer"].email
-      network         = var.vpc_network
-      subnetwork      = var.vpc_subnet
+      service_account      = google_service_account.udp_platform_sas["gcp-sa-nsedusc1-composer"].email
+      network              = var.vpc_network != "" ? var.vpc_network : null
+      subnetwork           = var.vpc_subnet != "" ? var.vpc_subnet : null
+      enable_ip_masq_agent = true
     }
   }
 }

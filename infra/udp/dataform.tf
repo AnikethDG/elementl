@@ -11,12 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# Dataform Repository in Consolidated GCP Project
-resource "google_dataform_repository" "udp_dataform_repo" {
-  provider     = google-beta
-  project      = var.project_id
-  region       = var.region
-  name         = "gcp-dataform-transformations"
-  display_name = "Elementl UDP Dataform Transformations (Bronze -> Silver -> Gold)"
-}

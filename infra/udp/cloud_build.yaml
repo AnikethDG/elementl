@@ -13,20 +13,96 @@
 # limitations under the License.
 
 steps:
-  - name: 'hashicorp/terraform:1.5'
-    dir: 'infra/udp'
-    entrypoint: 'sh'
+  - id: resolve-config
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    dir: infra/udp
+    entrypoint: bash
     args:
-      - '-c'
+      - -c
       - |
-        ENV_FILE="environments/${_ENVIRONMENT:-staging}.tfvars"
-        if [ ! -f "$$ENV_FILE" ]; then
-          ENV_FILE="environments/dev.tfvars"
+        set -euo pipefail
+        # Default to non-sensitive staging GCP project (pid-nse-stg-core-apps-k8ti)
+        ENVIRONMENT="staging"
+        TF_VARS_FILE="environments/staging.tfvars"
+        TARGET_PROJECT="pid-nse-stg-core-apps-k8ti"
+        STATE_BUCKET="gcs-pid-nse-stg-core-apps-k8ti-tfstate"
+        UDP_STATE_PREFIX="${_UDP_STATE_PREFIX:-terraform/udp/state}"
+
+        if ! gcloud storage ls "gs://$${STATE_BUCKET}" >/dev/null 2>&1; then
+          echo "Staging state bucket gs://$${STATE_BUCKET} not accessible by current runner SA; falling back to trigger project (${PROJECT_ID})."
+          case "${PROJECT_ID}" in
+            *prd*) ENVIRONMENT="production" ;;
+            *stg*) ENVIRONMENT="staging" ;;
+            *)     ENVIRONMENT="development" ;;
+          esac
+          TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
+          TARGET_PROJECT="${PROJECT_ID}"
+          STATE_BUCKET="gcs-$${TARGET_PROJECT}-tfstate"
         fi
-        TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*//p' "$$ENV_FILE" | head -n 1)
-        STATE_BUCKET="gcs-$${TARGET_PROJECT_ID}-tfstate"
-        terraform init -reconfigure           -backend-config="bucket=$$STATE_BUCKET"           -backend-config="prefix=terraform/udp/state"
-        terraform plan -out=tfplan -var-file="$$ENV_FILE"
-        if [ "${_TF_ACTION}" = "apply" ]; then
-          terraform apply -auto-approve tfplan
+
+        cat <<EOF > /workspace/tf_udp_env.sh
+        export ENVIRONMENT="$${ENVIRONMENT}"
+        export TF_VARS_FILE="$${TF_VARS_FILE}"
+        export TARGET_PROJECT="$${TARGET_PROJECT}"
+        export STATE_BUCKET="$${STATE_BUCKET}"
+        export UDP_STATE_PREFIX="$${UDP_STATE_PREFIX}"
+        EOF
+
+        cat /workspace/tf_udp_env.sh
+
+  - id: terraform-init
+    name: hashicorp/terraform:1.9.8
+    dir: infra/udp
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        . /workspace/tf_udp_env.sh
+        terraform init -reconfigure \
+          -backend-config="bucket=$${STATE_BUCKET}" \
+          -backend-config="prefix=$${UDP_STATE_PREFIX}"
+
+  - id: terraform-validate
+    name: hashicorp/terraform:1.9.8
+    dir: infra/udp
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        terraform validate
+
+  - id: terraform-plan
+    name: hashicorp/terraform:1.9.8
+    dir: infra/udp
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        . /workspace/tf_udp_env.sh
+        terraform plan -no-color -input=false -var-file="$${TF_VARS_FILE}" -out=udp_tfplan
+
+  - id: terraform-apply
+    name: hashicorp/terraform:1.9.8
+    dir: infra/udp
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        if [ "${_ACTION}" = "apply" ]; then
+          terraform apply -no-color -input=false -auto-approve udp_tfplan
+        else
+          echo "Skipping infra/udp/ terraform apply because _ACTION='${_ACTION}'."
         fi
+
+substitutions:
+  _ENVIRONMENT: 'staging'
+  _TARGET_PROJECT_ID: 'pid-nse-stg-core-apps-k8ti'
+  _ACTION: 'plan'
+  _UDP_STATE_PREFIX: 'terraform/udp/state'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

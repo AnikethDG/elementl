@@ -12,19 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Dedicated Docker Artifact Registry for UDP Cloud Run Ingestion Jobs (apps/udp/cloud-run-jobs/*)
-resource "google_artifact_registry_repository" "udp_ingestion_repo" {
-  project       = var.project_id
-  location      = var.region
-  repository_id = "udp-ingestion-jobs"
-  description   = "Docker Artifact Registry for UDP Cloud Run ingestion jobs (arcgis-ingestion, bulk-ingestion, jdbc-ingestion, suiteql-ingestion)"
-  format        = "DOCKER"
-
-  cleanup_policies {
-    id     = "keep-minimum-versions"
-    action = "KEEP"
-    most_recent_versions {
-      keep_count = 10
-    }
-  }
-}
+# NOTE ON TERRAFORM STATE SEPARATION:
+# Root `infra/` manages the core application Artifact Registry (`app-repo` in `infra/main.tf`)
+# under state prefix `terraform/infra/state`.
+# The UDP Docker Artifact Registry (`udp-ingestion-jobs`) and its Cloud Run Job IAM bindings
+# are managed exclusively in `infra/udp/artifact_registry.tf` under the isolated UDP state
+# prefix `terraform/udp/state` to prevent cross-state 409 resource collisions.

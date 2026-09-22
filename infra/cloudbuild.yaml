@@ -1,151 +1,186 @@
-# ==============================================================================
-# Cloud Build Pipeline: Infrastructure (Root infra/ + UDP infra/udp/)
-# ==============================================================================
-# - Pull Request Triggers: Runs 'terraform plan' only (for both infra/ and infra/udp/)
-# - Main Merge / Tag Triggers: Runs 'terraform plan' followed by 'terraform apply'
-# ==============================================================================
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 steps:
-  # 1. Resolve Environment & Terraform Init (Root infra/ + UDP infra/udp/)
-  - name: 'hashicorp/terraform:1.5'
-    entrypoint: 'sh'
+  - id: resolve-config
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    dir: infra
+    entrypoint: bash
     args:
-      - '-c'
+      - -c
       - |
-        RAW_ENV="${_ENVIRONMENT}"
-        case "$$RAW_ENV" in
-          stg|staging)
-            ENVIRONMENT="staging"
-            ENVIRONMENT_SHORT="stg"
-            ;;
-          prd|prod|production)
-            ENVIRONMENT="production"
-            ENVIRONMENT_SHORT="prd"
-            ;;
-          dev|development|*)
-            ENVIRONMENT="development"
-            ENVIRONMENT_SHORT="dev"
-            ;;
-        esac
+        set -euo pipefail
 
-        ENV_FILE="environments/$${ENVIRONMENT}.tfvars"
-        if [ ! -f "$$ENV_FILE" ]; then
-          echo "ERROR: Environment file '$$ENV_FILE' does not exist! Valid environments are development, staging, production." >&2
-          exit 1
+        # Default to non-sensitive staging GCP project (pid-nse-stg-core-apps-k8ti)
+        ENVIRONMENT="staging"
+        ENVIRONMENT_SHORT="stg"
+        TF_VARS_FILE="environments/staging.tfvars"
+        UDP_TF_VARS_FILE="environments/staging.tfvars"
+        TARGET_PROJECT="pid-nse-stg-core-apps-k8ti"
+        STATE_BUCKET="gcs-pid-nse-stg-core-apps-k8ti-tfstate"
+
+        # Verify if the active Cloud Build runner service account has access to the staging state bucket.
+        # If running inside an isolated dev-only PR trigger SA without cross-project access to staging,
+        # gracefully fall back to the trigger project's state bucket for CI validation.
+        if ! gcloud storage ls "gs://$${STATE_BUCKET}" >/dev/null 2>&1; then
+          echo "Staging state bucket gs://$${STATE_BUCKET} not accessible by current runner SA; falling back to trigger project (${PROJECT_ID}) for CI plan."
+          case "${PROJECT_ID}" in
+            *prd*)
+              ENVIRONMENT="production"
+              ENVIRONMENT_SHORT="prd"
+              ;;
+            *stg*)
+              ENVIRONMENT="staging"
+              ENVIRONMENT_SHORT="stg"
+              ;;
+            *)
+              ENVIRONMENT="development"
+              ENVIRONMENT_SHORT="dev"
+              ;;
+          esac
+          TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
+          UDP_TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
+          TARGET_PROJECT="${PROJECT_ID}"
+          STATE_BUCKET="gcs-$${TARGET_PROJECT}-tfstate"
         fi
 
-        # Extract project_id from tfvars
-        TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
-        if [ -z "$$TARGET_PROJECT_ID" ] && [ -f "$$ENV_FILE" ]; then
-          TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$ENV_FILE" | head -n 1)
-        fi
-
-        if [ -z "$$TARGET_PROJECT_ID" ]; then
-          echo "ERROR: Unable to resolve TARGET_PROJECT_ID from '$$ENV_FILE' for environment '${_ENVIRONMENT}'!" >&2
-          exit 1
-        fi
-
-        STATE_BUCKET="${_STATE_BUCKET:-gcs-$${TARGET_PROJECT_ID}-tfstate}"
         STATE_PREFIX="${_STATE_PREFIX:-terraform/infra/state}"
+        UDP_STATE_PREFIX="${_UDP_STATE_PREFIX:-terraform/udp/state}"
 
-        # Persist context for subsequent steps
-        echo "ENVIRONMENT=$$ENVIRONMENT" > .env.build
-        echo "ENVIRONMENT_SHORT=$$ENVIRONMENT_SHORT" >> .env.build
-        echo "ENV_FILE=$$ENV_FILE" >> .env.build
-        echo "TARGET_PROJECT_ID=$$TARGET_PROJECT_ID" >> .env.build
-        echo "STATE_BUCKET=$$STATE_BUCKET" >> .env.build
+        cat <<EOF > /workspace/tf_env.sh
+        export ENVIRONMENT="$${ENVIRONMENT}"
+        export ENVIRONMENT_SHORT="$${ENVIRONMENT_SHORT}"
+        export TF_VARS_FILE="$${TF_VARS_FILE}"
+        export UDP_TF_VARS_FILE="$${UDP_TF_VARS_FILE}"
+        export TARGET_PROJECT="$${TARGET_PROJECT}"
+        export STATE_BUCKET="$${STATE_BUCKET}"
+        export STATE_PREFIX="$${STATE_PREFIX}"
+        export UDP_STATE_PREFIX="$${UDP_STATE_PREFIX}"
+        EOF
 
-        echo "=================================================================="
-        echo "Initializing Root Terraform (infra/) for: $$ENVIRONMENT ($$ENVIRONMENT_SHORT)"
-        echo "Target Project: $$TARGET_PROJECT_ID | Bucket: $$STATE_BUCKET"
-        echo "=================================================================="
+        cat /workspace/tf_env.sh
 
-        terraform init -reconfigure \
-          -backend-config="bucket=$$STATE_BUCKET" \
-          -backend-config="prefix=$$STATE_PREFIX"
-
-        echo "=================================================================="
-        echo "Initializing UDP Terraform (infra/udp/) for: $$ENVIRONMENT ($$ENVIRONMENT_SHORT)"
-        echo "=================================================================="
-        cd udp
-        terraform init -reconfigure \
-          -backend-config="bucket=$$STATE_BUCKET" \
-          -backend-config="prefix=terraform/udp/state"
-    dir: 'infra'
-
-  # 2. Terraform Plan (Root infra/ + UDP infra/udp/)
-  - name: 'hashicorp/terraform:1.5'
-    entrypoint: 'sh'
+  # =========================================================================
+  # Stack 1: Root Core Application Infrastructure (infra/)
+  # State file: gs://<STATE_BUCKET>/terraform/infra/state/default.tfstate
+  # =========================================================================
+  - id: terraform-init
+    name: hashicorp/terraform:1.9.8
+    dir: infra
+    entrypoint: sh
     args:
-      - '-c'
+      - -c
       - |
-        . ./.env.build
-        echo "=================================================================="
-        echo "Running Root Terraform Plan (infra/) using: $$ENV_FILE"
-        echo "=================================================================="
-        terraform plan \
-          -out=tfplan \
-          -var-file="$$ENV_FILE" \
-          -var="region=$_REGION" \
-          -var="environment=$$ENVIRONMENT"
+        set -eu
+        . /workspace/tf_env.sh
+        terraform init -reconfigure \
+          -backend-config="bucket=$${STATE_BUCKET}" \
+          -backend-config="prefix=$${STATE_PREFIX}"
 
-        echo "=================================================================="
-        echo "Running UDP Terraform Plan (infra/udp/) using: $$ENV_FILE"
-        echo "=================================================================="
-        cd udp
-        terraform plan \
-          -out=tfplan \
-          -var-file="$$ENV_FILE" \
-          -var="region=$_REGION" \
-          -var="environment=$$ENVIRONMENT"
-    dir: 'infra'
-
-  # 3. Terraform Apply (Runs ONLY on main branch push, tag push, or explicit _TF_ACTION=apply)
-  - name: 'hashicorp/terraform:1.5'
-    entrypoint: 'sh'
+  - id: terraform-validate
+    name: hashicorp/terraform:1.9.8
+    dir: infra
+    entrypoint: sh
     args:
-      - '-c'
+      - -c
       - |
-        . ./.env.build
-        SHOULD_APPLY=false
-        if [ "${_TF_ACTION}" = "apply" ]; then
-          SHOULD_APPLY=true
-        elif [ "${_TF_ACTION}" = "plan" ]; then
-          SHOULD_APPLY=false
-        elif [ "${_TF_ACTION}" = "auto" ] || [ -z "${_TF_ACTION}" ]; then
-          if [ "$BRANCH_NAME" = "main" ] || [ -n "$TAG_NAME" ]; then
-            SHOULD_APPLY=true
-          fi
+        set -eu
+        terraform validate
+
+  - id: terraform-plan
+    name: hashicorp/terraform:1.9.8
+    dir: infra
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        . /workspace/tf_env.sh
+        terraform plan -no-color -input=false -var-file="$${TF_VARS_FILE}" -out=tfplan
+
+  - id: terraform-apply
+    name: hashicorp/terraform:1.9.8
+    dir: infra
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        if [ "${_ACTION}" = "apply" ]; then
+          terraform apply -no-color -input=false -auto-approve tfplan
+        else
+          echo "Skipping root infra/ terraform apply because _ACTION='${_ACTION}'."
         fi
 
-        if [ "$$SHOULD_APPLY" != "true" ]; then
-          echo "=================================================================="
-          echo "Skipping terraform apply (planning only)."
-          echo "Trigger details: BRANCH_NAME='$BRANCH_NAME', TAG_NAME='$TAG_NAME', _TF_ACTION='${_TF_ACTION}'"
-          echo "(Terraform apply executes only on 'main' branch, tag push, or when _TF_ACTION='apply')"
-          echo "=================================================================="
-          exit 0
+  # =========================================================================
+  # Stack 2: Unified Data Platform (UDP) Infrastructure (infra/udp/)
+  # Separate State file: gs://<STATE_BUCKET>/terraform/udp/state/default.tfstate
+  # =========================================================================
+  - id: udp-terraform-init
+    name: hashicorp/terraform:1.9.8
+    dir: infra/udp
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        . /workspace/tf_env.sh
+        terraform init -reconfigure \
+          -backend-config="bucket=$${STATE_BUCKET}" \
+          -backend-config="prefix=$${UDP_STATE_PREFIX}"
+
+  - id: udp-terraform-validate
+    name: hashicorp/terraform:1.9.8
+    dir: infra/udp
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        terraform validate
+
+  - id: udp-terraform-plan
+    name: hashicorp/terraform:1.9.8
+    dir: infra/udp
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        . /workspace/tf_env.sh
+        terraform plan -no-color -input=false -var-file="$${UDP_TF_VARS_FILE}" -out=udp_tfplan
+
+  - id: udp-terraform-apply
+    name: hashicorp/terraform:1.9.8
+    dir: infra/udp
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        set -eu
+        if [ "${_ACTION}" = "apply" ]; then
+          terraform apply -no-color -input=false -auto-approve udp_tfplan
+        else
+          echo "Skipping infra/udp/ terraform apply because _ACTION='${_ACTION}'."
         fi
-
-        echo "=================================================================="
-        echo "Applying Root Terraform plan (infra/) for $$ENVIRONMENT"
-        echo "=================================================================="
-        terraform apply -auto-approve tfplan
-
-        echo "=================================================================="
-        echo "Applying UDP Terraform plan (infra/udp/) for $$ENVIRONMENT"
-        echo "=================================================================="
-        cd udp
-        terraform apply -auto-approve tfplan
-    dir: 'infra'
 
 substitutions:
-  _TF_ACTION: 'auto'              # 'auto' (applies on main/tag, plans on other branches), or 'plan' / 'apply'
-  _ENVIRONMENT: 'development'     # 'development', 'staging', 'production'
-  _TARGET_PROJECT_ID: ''          # Auto-detected from tfvars if empty
+  _ENVIRONMENT: 'staging'
+  _TARGET_PROJECT_ID: 'pid-nse-stg-core-apps-k8ti'
+  _ACTION: 'plan'
   _STATE_PREFIX: 'terraform/infra/state'
-  _STATE_BUCKET: ''               # Defaults to gcs-${TARGET_PROJECT_ID}-tfstate
-  _REGION: 'us-central1'
+  _UDP_STATE_PREFIX: 'terraform/udp/state'
 
 options:
   logging: CLOUD_LOGGING_ONLY
