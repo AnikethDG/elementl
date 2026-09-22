@@ -16,10 +16,10 @@
 locals {
   udp_datasets = {
     # Standardized Naming Convention Datasets (Elementl UDP Naming Convention Doc + Per-Source Silver Split)
-    ds_bronze_p6           = "Bronze raw landing dataset for Oracle Primavera P6 (ELEMENTL_PMDB_SBOX_PXRPTUSER)"
+    ds_bronze_oracle_p6           = "Bronze raw landing dataset for Oracle Primavera P6 (ELEMENTL_PMDB_SBOX_PXRPTUSER)"
     ds_bronze_netsuite     = "Bronze raw landing dataset for Oracle NetSuite (SuiteQL 11 tables)"
     ds_bronze_atlas        = "Bronze raw landing dataset for Atlas GIS & Tabular (envelope schema + layers)"
-    ds_silver_p6           = "Silver 1:1 cleansed & standardized models for Oracle Primavera P6"
+    ds_silver_oracle_p6           = "Silver 1:1 cleansed & standardized models for Oracle Primavera P6"
     ds_silver_netsuite     = "Silver 1:1 cleansed & standardized models for Oracle NetSuite"
     ds_silver_atlas        = "Silver 1:1 cleansed & standardized models for Atlas GIS & Tabular"
     ds_gold                = "Gold conformed & curated business data models and executive views"
@@ -30,8 +30,8 @@ locals {
 
   # Discover all 15 P6 Bronze schemas and 11 NetSuite Bronze schemas from apps/udp/configs/schema/
   p6_schema_files = {
-    for f in fileset("${path.module}/../../apps/udp/configs/schema/p6", "p6_*_schema.json") :
-    replace(replace(f, "p6_", ""), "_schema.json", "") => "${path.module}/../../apps/udp/configs/schema/p6/${f}"
+    for f in fileset("${path.module}/../../apps/udp/configs/schema/oracle_p6", "oracle_p6_*_schema.json") :
+    replace(f, "_schema.json", "") => "${path.module}/../../apps/udp/configs/schema/oracle_p6/${f}"
   }
 
   netsuite_schema_files = {
@@ -50,11 +50,11 @@ resource "google_bigquery_dataset" "datasets" {
   delete_contents_on_destroy = false
 }
 
-# Terraform-Managed Bronze Tables for Oracle Primavera P6 (15 tables in ds_bronze_p6)
-resource "google_bigquery_table" "bronze_p6_tables" {
+# Terraform-Managed Bronze Tables for Oracle Primavera P6 (15 tables in ds_bronze_oracle_p6)
+resource "google_bigquery_table" "bronze_oracle_p6_tables" {
   for_each            = local.p6_schema_files
   project             = var.project_id
-  dataset_id          = google_bigquery_dataset.datasets["ds_bronze_p6"].dataset_id
+  dataset_id          = google_bigquery_dataset.datasets["ds_bronze_oracle_p6"].dataset_id
   table_id            = each.key
   description         = "Bronze landing table for Oracle Primavera P6 ELEMENTL_PMDB_SBOX_PXRPTUSER.${upper(each.key)}"
   schema              = file(each.value)

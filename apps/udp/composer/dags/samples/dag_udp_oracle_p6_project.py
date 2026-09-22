@@ -39,14 +39,14 @@ default_args = {
 }
 
 with DAG(
-    dag_id="dag_udp_p6_project",
+    dag_id="dag_udp_oracle_p6_project",
     default_args=default_args,
     description="Primavera P6 Project Master Schedules (JDBC Ingestion)",
     schedule=None,
     start_date=datetime(2024, 1, 1),
     catchup=False,
     max_active_runs=1,
-    tags=["udp", "p6", "p6_project", "composer_v3"],
+    tags=["udp", "oracle_p6", "oracle_p6_project", "composer_v3"],
 ) as dag:
 
     with TaskGroup(group_id="ingestion_group", tooltip="Cloud Run Ingestion + Bronze BQ Load") as ingestion_group:
@@ -59,16 +59,16 @@ with DAG(
                 "container_overrides": [
                     {
                         "env": [
-                            {"name": "TASK_ID", "value": "p6_project"},
-                            {"name": "SOURCE_TYPE", "value": "p6"},
-                            {"name": "SOURCE_SYSTEM", "value": "p6"},
+                            {"name": "TASK_ID", "value": "oracle_p6_project"},
+                            {"name": "SOURCE_TYPE", "value": "oracle_p6"},
+                            {"name": "SOURCE_SYSTEM", "value": "oracle_p6"},
                             {"name": "SOURCE_TABLE", "value": "PROJECT"},
-                            {"name": "TARGET_DATASET", "value": "ds_bronze_p6"},
-                            {"name": "TARGET_TABLE", "value": "p6_project"},
+                            {"name": "TARGET_DATASET", "value": "ds_bronze_oracle_p6"},
+                            {"name": "TARGET_TABLE", "value": "oracle_p6_project"},
                             {"name": "WHERE_CLAUSE", "value": "ROWNUM <= 20"},
                             {"name": "MAX_RECORDS", "value": "20"},
                             {"name": "GCS_BUCKET", "value": RAW_BUCKET},
-                            {"name": "GCS_PREFIX", "value": "p6/raw/p6_project/dt={{ ds }}"},
+                            {"name": "GCS_PREFIX", "value": "oracle_p6/raw/oracle_p6_project/dt={{ ds }}"},
                             {"name": "EXECUTION_DATE", "value": "{{ ds }}"},
                             {"name": "RUN_ID", "value": "{{ run_id }}"},
                             {"name": "DAG_ID", "value": "{{ dag.dag_id }}"},
@@ -90,8 +90,8 @@ with DAG(
         load_gcs_to_bq_bronze = GCSToBigQueryOperator(
             task_id="load_gcs_to_bq_bronze",
             bucket=RAW_BUCKET,
-            source_objects=["p6/raw/p6_project/dt={{ ds }}/*.parquet"],
-            destination_project_dataset_table=f"{PROJECT_ID}.ds_bronze_p6.p6_project",
+            source_objects=["oracle_p6/raw/oracle_p6_project/dt={{ ds }}/*.parquet"],
+            destination_project_dataset_table=f"{PROJECT_ID}.ds_bronze_oracle_p6.oracle_p6_project",
             source_format="PARQUET",
             write_disposition="WRITE_TRUNCATE",
             autodetect=True,
@@ -117,7 +117,7 @@ with DAG(
             workflow_invocation={
                 "compilation_result": "{{ task_instance.xcom_pull('dataform_group.compile_dataform')['name'] }}",
                 "invocation_config": {
-                    "included_tags": ["p6"],
+                    "included_tags": ["oracle_p6"],
                     "transitive_dependencies_included": True,
                     "service_account": DATAFORM_SA,
                 },

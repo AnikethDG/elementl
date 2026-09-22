@@ -36,18 +36,18 @@ from google.cloud import bigquery, secretmanager, storage
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("jdbc-ingestion")
 
-# Canonical table mapping: Source P6 Reporting View/Table -> (GCS folder slug, BigQuery ds_bronze_p6 table name)
+# Canonical table mapping: Source P6 Reporting View/Table -> (GCS folder slug, BigQuery ds_bronze_oracle_p6 table name)
 DEFAULT_P6_TABLE_MAP: dict[str, tuple[str, str]] = {
-    "PROJECT": ("projects", "p6_projects"),
-    "WBS": ("wbs", "p6_wbs"),
-    "WBSCATEGORY": ("wbscategory", "p6_wbscategory"),
-    "ACTIVITY": ("activities", "p6_activities"),
-    "UDFVALUE": ("udf_values", "p6_udf_values"),
-    "UDFTYPE": ("udf_types", "p6_udf_types"),
-    "ACTIVITYCODE": ("activitycode", "p6_activitycode"),
-    "ACTIVITYCODETYPE": ("activitycodetype", "p6_activitycodetype"),
-    "ACTIVITYCODEASSIGNMENT": ("activitycodeassignment", "p6_activitycodeassignment"),
-    "REFRDELETE": ("refrdelete", "p6_refrdelete"),
+    "PROJECT": ("projects", "oracle_p6_projects"),
+    "WBS": ("wbs", "oracle_p6_wbs"),
+    "WBSCATEGORY": ("wbscategory", "oracle_p6_wbscategory"),
+    "ACTIVITY": ("activities", "oracle_p6_activities"),
+    "UDFVALUE": ("udf_values", "oracle_p6_udf_values"),
+    "UDFTYPE": ("udf_types", "oracle_p6_udf_types"),
+    "ACTIVITYCODE": ("activitycode", "oracle_p6_activitycode"),
+    "ACTIVITYCODETYPE": ("activitycodetype", "oracle_p6_activitycodetype"),
+    "ACTIVITYCODEASSIGNMENT": ("activitycodeassignment", "oracle_p6_activitycodeassignment"),
+    "REFRDELETE": ("refrdelete", "oracle_p6_refrdelete"),
 }
 
 
@@ -235,7 +235,7 @@ def main() -> int:
     raw_bucket_name = os.environ.get("RAW_BUCKET_NAME", f"bkt-{project_id}-udp-bronze-raw")
     preferred_schema = os.environ.get("P6_SCHEMA", "ELEMENTL_PMDB_SBOX_PXRPTUSER")
     row_limit = int(os.environ.get("ROW_LIMIT", "20"))
-    bq_dataset = os.environ.get("TARGET_DATASET") or os.environ.get("BQ_BRONZE_DATASET", "ds_bronze_p6")
+    bq_dataset = os.environ.get("TARGET_DATASET") or os.environ.get("BQ_BRONZE_DATASET", "ds_bronze_oracle_p6")
 
     try:
         egress_ip = requests.get("https://api.ipify.org", timeout=5).text.strip()
@@ -316,7 +316,7 @@ def main() -> int:
     except Exception as exc:
         if os.environ.get("ALLOW_MOCK_FALLBACK", "true").lower() == "true":
             target_table = os.environ.get("TABLE_NAME") or os.environ.get("TARGET_TABLE") or "project"
-            bq_table = os.environ.get("TARGET_TABLE") or "p6_project"
+            bq_table = os.environ.get("TARGET_TABLE") or "oracle_p6_project"
             logger.warning(
                 "Oracle P6 RDS live connection unavailable (%s); synthesizing mock Bronze records for table=%s",
                 exc,
@@ -442,7 +442,7 @@ def main() -> int:
                 dest_format=dest_format,
             )
 
-            # 2. Load into BigQuery Native Bronze Dataset (ds_bronze_p6)
+            # 2. Load into BigQuery Native Bronze Dataset (ds_bronze_oracle_p6)
             bq_loaded = ensure_and_populate_bq_table(
                 bq_client=bq_client,
                 project_id=project_id,

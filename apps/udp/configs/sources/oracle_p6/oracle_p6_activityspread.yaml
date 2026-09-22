@@ -14,18 +14,18 @@
 
 template: ingestion_task_metadata
 version: '1.0'
-task_id: p6_wbs
-display_name: "Primavera P6 Work Breakdown Structure (WBS)"
-description: "Extracts hierarchical WBS nodes, parent-child trees, phase identifiers, and milestones."
+task_id: oracle_p6_activityspread
+display_name: "Primavera P6 Activity Spreads & Periodics"
+description: "Extracts periodic cost, unit, and duration spreads across activity timelines."
 domain: "project_controls"
 metadata_status: Active
 
 source:
-  type: p6
+  type: oracle_p6
   connection_type: jdbc
   connection_secret_id: "secret-p6-db-config"
   source_schema: "ELEMENTL_PMDB_SBOX_PXRPTUSER"
-  source_table: WBS
+  source_table: ACTIVITYSPREAD
   primary_key: OBJECTID
   load_type: full_refresh
   watermark_column: LASTUPDATEDATE
@@ -43,17 +43,17 @@ destination:
   format: PARQUET
   schema_strategy: static
   gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
-  gcs_prefix: "p6/raw/p6_wbs/dt={{ ds }}/"
+  gcs_prefix: "oracle_p6/raw/oracle_p6_activityspread/dt={{ ds }}/"
   bq_project: "elementl-509009"
-  bq_dataset: "ds_bronze_p6"
-  bq_table: "p6_wbs"
+  bq_dataset: "ds_bronze_oracle_p6"
+  bq_table: "oracle_p6_activityspread"
   write_disposition: WRITE_TRUNCATE
   partition_field: ingestion_date
   cluster_fields:
     - OBJECTID
 
 orchestration:
-  dag_id: dag_udp_p6_wbs
+  dag_id: dag_udp_oracle_p6_activityspread
   schedule: "@daily"
   start_date: "2024-01-01 00:00:00"
   catchup: false
@@ -61,14 +61,14 @@ orchestration:
   retry_delay_minutes: 5
   concurrency: 1
   dag_tags:
-    - "source:p6"
+    - "source:oracle_p6"
     - "engine:cloud_run_job"
     - "zone:raw"
   dataform:
     enabled: true
-    target_dataset: "ds_silver"
-    target_table: "stg_p6_wbs"
+    target_dataset: "ds_silver_oracle_p6"
+    target_table: "stg_oracle_p6_activityspread"
     included_tags:
-      - "p6"
-      - "p6_wbs"
+      - "oracle_p6"
+      - "oracle_p6_activityspread"
     transitive_dependencies_included: false

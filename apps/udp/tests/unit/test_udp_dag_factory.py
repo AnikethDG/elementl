@@ -36,17 +36,17 @@ class TestUDPDagFactory:
 
         # Verify all 3 primary source systems represented
         assert "netsuite" in source_systems
-        assert "p6" in source_systems
+        assert "oracle_p6" in source_systems
         assert "atlas" in source_systems
 
         # Sample tasks across systems and formats
         assert "netsuite_department" in task_ids
-        assert "p6_activity" in task_ids
+        assert "oracle_p6_activity" in task_ids
         assert "atlas_s1_01_population_density" in task_ids
         assert "sample_netsuite_csv" in task_ids
         assert "sample_netsuite_json" in task_ids
-        assert "sample_p6_csv" in task_ids
-        assert "sample_p6_json" in task_ids
+        assert "sample_oracle_p6_csv" in task_ids
+        assert "sample_oracle_p6_json" in task_ids
         assert "sample_atlas_same_as_origin" in task_ids
         assert "sample_atlas_parquet" in task_ids
         assert "sample_atlas_csv" in task_ids
@@ -55,8 +55,8 @@ class TestUDPDagFactory:
         config_formats = {c["task_id"]: (c.get("destination", {}).get("format") or c.get("format", "")).lower() for c in configs}
         assert config_formats["sample_netsuite_csv"] == "csv"
         assert config_formats["sample_netsuite_json"] == "json"
-        assert config_formats["sample_p6_csv"] == "csv"
-        assert config_formats["sample_p6_json"] == "json"
+        assert config_formats["sample_oracle_p6_csv"] == "csv"
+        assert config_formats["sample_oracle_p6_json"] == "json"
         assert config_formats["sample_atlas_same_as_origin"] in ("same_as_origin", "same as origin")
         assert config_formats["sample_atlas_parquet"] == "parquet"
 
@@ -83,8 +83,8 @@ class TestUDPDagFactory:
 
         # Primavera P6 with SAME_AS_ORIGIN must raise ValueError
         p6_cfg = {
-            "task_id": "test_p6",
-            "source": {"type": "p6"},
+            "task_id": "test_oracle_p6",
+            "source": {"type": "oracle_p6"},
             "destination": {"format": "SAME_AS_ORIGIN"},
         }
         with pytest.raises(ValueError, match="only allowed for Atlas"):

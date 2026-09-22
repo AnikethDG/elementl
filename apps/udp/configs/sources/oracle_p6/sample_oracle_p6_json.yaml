@@ -14,20 +14,20 @@
 
 template: ingestion_task_metadata
 version: '1.0'
-task_id: sample_p6_csv
-display_name: "Sample P6 CSV Ingestion"
-description: "Sample configuration demonstrating CSV landing format for Primavera P6 JDBC extraction."
+task_id: sample_oracle_p6_json
+display_name: "Sample P6 JSON Ingestion"
+description: "Sample configuration demonstrating JSON (NDJSON) landing format for Primavera P6 JDBC extraction."
 domain: "projects"
 metadata_status: Active
 
 source:
-  type: p6
+  type: oracle_p6
   load_type: full_refresh
   watermark_column: last_recalc_date
   connection_secret_id: "secret-p6-db-credentials"
   extraction_type: jdbc
-  source_table: PROJECT
-  primary_key: PROJ_ID
+  source_table: WBS
+  primary_key: WBS_ID
   where_clause: "ROWNUM <= 10"
   max_records: 10
   fetch_size: 5000
@@ -39,20 +39,20 @@ engine:
   timeout_seconds: 1800
 
 destination:
-  format: CSV
+  format: JSON
   schema_strategy: static
   gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
-  gcs_prefix: "p6/raw/sample_p6_csv/dt={{ ds }}/"
+  gcs_prefix: "oracle_p6/raw/sample_oracle_p6_json/dt={{ ds }}/"
   bq_project: "elementl-509009"
-  bq_dataset: "ds_bronze_p6"
-  bq_table: "sample_p6_csv"
+  bq_dataset: "ds_bronze_oracle_p6"
+  bq_table: "sample_oracle_p6_json"
   write_disposition: WRITE_TRUNCATE
   partition_field: ingestion_date
   cluster_fields:
-    - PROJ_ID
+    - WBS_ID
 
 orchestration:
-  dag_id: dag_udp_sample_p6_csv
+  dag_id: dag_udp_sample_oracle_p6_json
   schedule: "@daily"
   start_date: "2024-01-01 00:00:00"
   catchup: false
@@ -60,8 +60,8 @@ orchestration:
   retry_delay_minutes: 5
   dataform:
     enabled: true
-    target_dataset: "ds_silver"
-    target_table: "stg_sample_p6_csv"
+    target_dataset: "ds_silver_oracle_p6"
+    target_table: "stg_sample_p6_json"
     included_tags:
       - p6
-      - sample_p6_csv
+      - sample_p6_json

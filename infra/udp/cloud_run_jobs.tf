@@ -50,8 +50,8 @@ locals {
       cpu             = "2"
       memory          = "4Gi"
       source_type     = "JDBC_P6"
-      bronze_dataset  = "ds_bronze_p6"
-      silver_dataset  = "ds_silver_p6"
+      bronze_dataset  = "ds_bronze_oracle_p6"
+      silver_dataset  = "ds_silver_oracle_p6"
     }
   }
 
@@ -214,7 +214,7 @@ resource "google_secret_manager_secret_iam_member" "jdbc_p6_ca_access" {
 }
 
 resource "google_bigquery_dataset_iam_member" "jdbc_p6_raw_dataset_access" {
-  for_each   = toset(["ds_bronze_p6", "ds_operations"])
+  for_each   = toset(["ds_bronze_oracle_p6", "ds_operations"])
   project    = var.project_id
   dataset_id = google_bigquery_dataset.datasets[each.key].dataset_id
   role       = "roles/bigquery.dataEditor"

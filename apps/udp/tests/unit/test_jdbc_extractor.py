@@ -46,7 +46,7 @@ class TestJDBCExtractor:
             assert key in DEFAULT_P6_TABLE_MAP
             folder_slug, bq_table_name = DEFAULT_P6_TABLE_MAP[key]
             assert isinstance(folder_slug, str)
-            assert bq_table_name.startswith("p6_")
+            assert bq_table_name.startswith("oracle_p6_")
 
     def test_sanitize_value_types(self):
         assert sanitize_value(None) is None
