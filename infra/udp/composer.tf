@@ -87,10 +87,9 @@ resource "google_composer_environment" "udp_composer" {
     }
 
     node_config {
-      service_account      = google_service_account.udp_platform_sas["gcp-sa-nsedusc1-composer"].email
-      network              = var.vpc_network != "" ? var.vpc_network : null
-      subnetwork           = var.vpc_subnet != "" ? var.vpc_subnet : null
-      enable_ip_masq_agent = true
+      service_account = google_service_account.udp_platform_sas["gcp-sa-nsedusc1-composer"].email
+      network         = var.vpc_network != "" ? var.vpc_network : null
+      subnetwork      = var.vpc_subnet != "" ? var.vpc_subnet : null
     }
   }
 }
