@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Consolidated Project BigQuery Ingestion Datasets & Ingestion Tables
+# Consolidated Project BigQuery Ingestion Datasets & Operational Tables
 locals {
   udp_datasets = {
     # Ingestion (Bronze Landing) & Ingestion Operational Metadata Datasets Only
@@ -20,20 +20,6 @@ locals {
     ds_bronze_netsuite  = "Bronze raw landing dataset for Oracle NetSuite (SuiteQL 11 tables)"
     ds_bronze_atlas     = "Bronze raw landing dataset for Atlas GIS & Tabular (envelope schema + layers)"
     ds_operations       = "Operational metadata dataset driving DAG Factory, watermarks, and ingestion execution logs"
-  }
-
-  # Discover all 15 Oracle P6 Bronze table schemas from apps/udp/configs/schema/oracle_p6/
-  oracle_p6_schema_files = fileset("${path.module}/../../apps/udp/configs/schema/oracle_p6", "*.json")
-  bronze_oracle_p6_tables = {
-    for f in local.oracle_p6_schema_files :
-    replace(f, "_schema.json", "") => "${path.module}/../../apps/udp/configs/schema/oracle_p6/${f}"
-  }
-
-  # Discover all 11 NetSuite Bronze table schemas from apps/udp/configs/schema/netsuite/
-  netsuite_schema_files = fileset("${path.module}/../../apps/udp/configs/schema/netsuite", "*.json")
-  bronze_netsuite_tables = {
-    for f in local.netsuite_schema_files :
-    replace(f, "_schema.json", "") => "${path.module}/../../apps/udp/configs/schema/netsuite/${f}"
   }
 }
 
@@ -44,28 +30,6 @@ resource "google_bigquery_dataset" "datasets" {
   location                   = var.region
   description                = each.value
   delete_contents_on_destroy = false
-}
-
-# 15 Oracle Primavera P6 Bronze Ingestion Tables (oracle_p6_*)
-resource "google_bigquery_table" "bronze_oracle_p6_tables" {
-  for_each            = local.bronze_oracle_p6_tables
-  project             = var.project_id
-  dataset_id          = google_bigquery_dataset.datasets["ds_bronze_oracle_p6"].dataset_id
-  table_id            = each.key
-  description         = "Bronze raw ingestion table for Oracle Primavera P6 (${each.key})"
-  schema              = file(each.value)
-  deletion_protection = false
-}
-
-# 11 Oracle NetSuite Bronze Ingestion Tables (netsuite_*)
-resource "google_bigquery_table" "bronze_netsuite_tables" {
-  for_each            = local.bronze_netsuite_tables
-  project             = var.project_id
-  dataset_id          = google_bigquery_dataset.datasets["ds_bronze_netsuite"].dataset_id
-  table_id            = each.key
-  description         = "Bronze raw ingestion table for Oracle NetSuite (${each.key})"
-  schema              = file(each.value)
-  deletion_protection = false
 }
 
 # Ingestion Framework Operational Execution Logs Table in ds_operations
