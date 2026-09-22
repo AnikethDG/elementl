@@ -14,9 +14,11 @@
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    dir: 'app/udp/cloud-run-jobs/arcgis-ingestion'
+    dir: 'app/udp/cloud-run-jobs'
     args:
       - 'build'
+      - '-f'
+      - 'arcgis-ingestion/Dockerfile'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/arcgis-ingestion:${SHORT_SHA}'
       - '-t'

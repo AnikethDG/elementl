@@ -12,19 +12,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+template: ingestion_task_metadata
+version: '1.0'
 task_id: p6_epsspread
-source_system: p6
-ingestion_job: jdbc-ingestion
-source_schema: ELEMENTL_PMDB_SBOX_PXRPTUSER
-source_table: EPSSPREAD
-primary_key: EPSOBJECTID
-watermark_column: STARTDATE
-sample_where_clause: "ROWNUM <= 20"
-target_dataset: ds_bronze_p6
-target_table: p6_epsspread
-silver_dataset: ds_silver_p6
-silver_table: stg_p6_epsspread
-dataform_tags:
-  - p6
-  - p6_epsspread
-schedule: "@daily"
+display_name: "Primavera P6 EPS Periodic Spreads"
+description: "Extracts enterprise project structure periodic summaries and portfolio spreads."
+domain: "project_controls"
+metadata_status: Active
+
+source:
+  type: p6
+  connection_type: jdbc
+  connection_secret_id: "secret-p6-db-config"
+  source_schema: "ELEMENTL_PMDB_SBOX_PXRPTUSER"
+  source_table: EPSSPREAD
+  primary_key: OBJECTID
+  load_type: full_refresh
+  watermark_column: LASTUPDATEDATE
+  where_clause: "ROWNUM <= 20"
+  max_records: 20
+  fetch_size: 5000
+  timeout_seconds: 300
+
+engine:
+  type: cloud_run_job
+  job_name: jdbc-ingestion
+  timeout_seconds: 1800
+
+destination:
+  format: PARQUET
+  schema_strategy: static
+  gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
+  gcs_prefix: "p6/raw/p6_epsspread/dt={{ ds }}/"
+  bq_project: "elementl-509009"
+  bq_dataset: "ds_bronze_p6"
+  bq_table: "p6_epsspread"
+  write_disposition: WRITE_TRUNCATE
+  partition_field: ingestion_date
+  cluster_fields:
+    - OBJECTID
+
+orchestration:
+  dag_id: dag_udp_p6_epsspread
+  schedule: "@daily"
+  start_date: "2024-01-01 00:00:00"
+  catchup: false
+  retries: 2
+  retry_delay_minutes: 5
+  concurrency: 1
+  dag_tags:
+    - "source:p6"
+    - "engine:cloud_run_job"
+    - "zone:raw"
+  dataform:
+    enabled: true
+    target_dataset: "ds_silver"
+    target_table: "stg_p6_epsspread"
+    included_tags:
+      - "p6"
+      - "p6_epsspread"
+    transitive_dependencies_included: false

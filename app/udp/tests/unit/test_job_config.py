@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,7 +32,7 @@ class TestJobConfig:
             "GCS_BUCKET": "test-bronze-bucket",
             "GCS_PREFIX": "netsuite/raw/department/dt=2026-09-18",
             "DESTINATION_FORMAT": "parquet",
-            "AUDIT_PROJECT": "pid-nse-stg-core-apps-k8ti",
+            "AUDIT_PROJECT": "elementl-509009",
             "AUDIT_DATASET": "ds_operations",
             "AUDIT_TABLE": "ingestion_execution_logs",
             "TARGET_DATASET": "ds_bronze_netsuite",
@@ -52,7 +52,7 @@ class TestJobConfig:
         assert cfg.timeout_seconds == 120
         assert cfg.query_params == {"limit": 10, "active_only": True}
         assert cfg.audit_enabled is True
-        assert cfg.audit_full_table == "pid-nse-stg-core-apps-k8ti.ds_operations.ingestion_execution_logs"
+        assert cfg.audit_full_table == "elementl-509009.ds_operations.ingestion_execution_logs"
 
     def test_missing_required_env_raises_value_error(self):
         env = {

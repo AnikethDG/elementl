@@ -12,17 +12,68 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+template: ingestion_task_metadata
+version: '1.0'
 task_id: atlas_s1_02_urban_areas
-source_system: atlas
-layer_id: "S1-02"
-ingestion_job: arcgis-ingestion
-endpoint_url: "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer"
-unpack_zip_to_envelope_schema: true
-target_dataset: ds_bronze_atlas
-target_table: atlas_s1_02_urban_areas
-silver_dataset: ds_silver_atlas
-silver_table: stg_atlas_s1_02_urban_areas
-dataform_tags:
-  - atlas
-  - atlas_s1_02_urban_areas
-schedule: "@weekly"
+display_name: "U.S. Census Bureau TIGERweb Delineated Urban Areas & Places"
+description: "Ingests 2020 Census Urban Areas & Places from Census TIGERweb ArcGIS REST MapServer serving Criteria S1-02, S1-03, S1-04, and S1-05."
+domain: "demographics_socioeconomics"
+metadata_status: Active
+
+source:
+  type: atlas
+  category: arcgis_rest
+  format: geojson_ndjson
+  load_type: full_refresh
+  connection:
+    endpoint_url: "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer"
+    layer_id: 0
+    auth_type: none
+    query_params:
+      where: "1=1"
+      outFields: "*"
+    timeout_seconds: 180
+    max_retries: 5
+
+engine:
+  type: cloud_run_job
+  job_name: arcgis-ingestion
+  timeout_seconds: 3600
+
+destination:
+  format: GEOJSON_NDJSON
+  schema_strategy: generic_envelope
+  domain_tags:
+    - "S1-02"
+    - "urban_areas"
+    - "exclusionary"
+  unpack_archive: false
+  gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
+  gcs_prefix: "atlas/raw/atlas_s1_02_urban_areas/dt={{ ds }}/"
+  bq_project: "elementl-509009"
+  bq_dataset: "ds_bronze_atlas"
+  bq_table: "atlas_s1_02_urban_areas"
+  write_disposition: WRITE_TRUNCATE
+  partition_field: ingestion_date
+
+orchestration:
+  dag_id: dag_udp_atlas_s1_02_urban_areas
+  schedule: "@weekly"
+  start_date: "2024-01-01 00:00:00"
+  catchup: false
+  retries: 2
+  retry_delay_minutes: 5
+  concurrency: 1
+  dag_tags:
+    - "source:atlas"
+    - "engine:cloud_run_job"
+    - "zone:raw"
+    - "criteria:s1_02"
+  dataform:
+    enabled: true
+    target_dataset: "ds_silver"
+    target_table: "stg_atlas_s1_02_urban_areas"
+    included_tags:
+      - "atlas"
+      - "atlas_s1_02_urban_areas"
+    transitive_dependencies_included: false

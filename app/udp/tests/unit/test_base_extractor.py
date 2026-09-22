@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -63,7 +63,7 @@ class TestBaseExtractor:
 
         rec_count, byte_count, uris = extractor.write_records_to_gcs(
             records=sample_records,
-            gcs_bucket_name="bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw",
+            gcs_bucket_name="bkt-elementl-509009-udp-bronze-raw",
             gcs_prefix="netsuite/raw/department",
             file_format="parquet",
             partition_date="2026-09-18",
@@ -72,7 +72,7 @@ class TestBaseExtractor:
         assert rec_count == 2
         assert byte_count > 0
         assert len(uris) == 1
-        assert uris[0].startswith("gs://bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw/netsuite/raw/department/data_")
+        assert uris[0].startswith("gs://bkt-elementl-509009-udp-bronze-raw/netsuite/raw/department/data_")
         assert uris[0].endswith(".parquet")
 
         # Verify that mock_blob received valid Snappy Parquet bytes
@@ -89,12 +89,12 @@ class TestBaseExtractor:
     def test_write_records_to_gcs_jsonl(self, extractor, sample_records):
         mock_blob = MagicMock()
         mock_bucket = MagicMock()
-        mock_bucket.blob.return_value = mock_bucket.blob.return_value = mock_blob
+        mock_bucket.blob.return_value = mock_blob
         extractor.storage_client.bucket.return_value = mock_bucket
 
         rec_count, byte_count, uris = extractor.write_records_to_gcs(
             records=sample_records,
-            gcs_bucket_name="bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw",
+            gcs_bucket_name="bkt-elementl-509009-udp-bronze-raw",
             gcs_prefix="atlas/raw/water",
             file_format="jsonl",
             partition_date="2026-09-18",
@@ -107,10 +107,61 @@ class TestBaseExtractor:
         content_type = mock_blob.upload_from_string.call_args[1].get("content_type")
         assert content_type == "application/x-ndjson"
 
+    def test_write_records_to_gcs_csv(self, extractor, sample_records):
+        mock_blob = MagicMock()
+        mock_bucket = MagicMock()
+        mock_bucket.blob.return_value = mock_blob
+        extractor.storage_client.bucket.return_value = mock_bucket
+
+        rec_count, byte_count, uris = extractor.write_records_to_gcs(
+            records=sample_records,
+            gcs_bucket_name="bkt-elementl-509009-udp-bronze-raw",
+            gcs_prefix="netsuite/raw/account",
+            file_format="csv",
+            partition_date="2026-09-18",
+        )
+
+        assert rec_count == 2
+        assert byte_count > 0
+        assert len(uris) == 1
+        assert uris[0].endswith(".csv")
+        mock_blob.upload_from_string.assert_called_once()
+        uploaded_bytes = mock_blob.upload_from_string.call_args[0][0]
+        content_type = mock_blob.upload_from_string.call_args[1].get("content_type")
+        assert content_type == "text/csv"
+
+        csv_text = uploaded_bytes.decode("utf-8")
+        lines = [line for line in csv_text.splitlines() if line.strip()]
+        assert len(lines) == 3  # Header + 2 data rows
+        assert "ingestion_date" in lines[0]
+        assert "ingestion_timestamp" in lines[0]
+
+    def test_write_records_to_gcs_same_as_origin(self, extractor, sample_records):
+        mock_blob = MagicMock()
+        mock_bucket = MagicMock()
+        mock_bucket.blob.return_value = mock_blob
+        extractor.storage_client.bucket.return_value = mock_bucket
+
+        rec_count, byte_count, uris = extractor.write_records_to_gcs(
+            records=sample_records,
+            gcs_bucket_name="bkt-elementl-509009-udp-bronze-raw",
+            gcs_prefix="atlas/raw/environment",
+            file_format="SAME_AS_ORIGIN",
+            partition_date="2026-09-18",
+        )
+
+        assert rec_count == 2
+        assert byte_count > 0
+        assert len(uris) == 1
+        assert uris[0].endswith(".json")
+        mock_blob.upload_from_string.assert_called_once()
+        content_type = mock_blob.upload_from_string.call_args[1].get("content_type")
+        assert content_type == "application/x-ndjson"
+
     def test_write_empty_records(self, extractor):
         rec_count, byte_count, uris = extractor.write_records_to_gcs(
             records=[],
-            gcs_bucket_name="bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw",
+            gcs_bucket_name="bkt-elementl-509009-udp-bronze-raw",
             gcs_prefix="empty/prefix",
         )
         assert rec_count == 0

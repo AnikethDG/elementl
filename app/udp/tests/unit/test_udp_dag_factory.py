@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,10 +39,56 @@ class TestUDPDagFactory:
         assert "p6" in source_systems
         assert "atlas" in source_systems
 
-        # Sample tasks across systems
+        # Sample tasks across systems and formats
         assert "netsuite_department" in task_ids
         assert "p6_activity" in task_ids
         assert "atlas_s1_01_population_density" in task_ids
+        assert "sample_netsuite_csv" in task_ids
+        assert "sample_netsuite_json" in task_ids
+        assert "sample_p6_csv" in task_ids
+        assert "sample_p6_json" in task_ids
+        assert "sample_atlas_same_as_origin" in task_ids
+        assert "sample_atlas_parquet" in task_ids
+        assert "sample_atlas_csv" in task_ids
+
+        # Verify destination formats are captured
+        config_formats = {c["task_id"]: (c.get("destination", {}).get("format") or c.get("format", "")).lower() for c in configs}
+        assert config_formats["sample_netsuite_csv"] == "csv"
+        assert config_formats["sample_netsuite_json"] == "json"
+        assert config_formats["sample_p6_csv"] == "csv"
+        assert config_formats["sample_p6_json"] == "json"
+        assert config_formats["sample_atlas_same_as_origin"] in ("same_as_origin", "same as origin")
+        assert config_formats["sample_atlas_parquet"] == "parquet"
+
+    def test_same_as_origin_allowed_only_for_atlas(self):
+        from composer.dags.udp_dag_factory import _normalize_config
+
+        # Atlas with SAME_AS_ORIGIN must succeed
+        atlas_cfg = {
+            "task_id": "test_atlas",
+            "source": {"type": "atlas"},
+            "destination": {"format": "SAME_AS_ORIGIN"},
+        }
+        normalized_atlas = _normalize_config(atlas_cfg)
+        assert normalized_atlas["destination_format"] == "SAME_AS_ORIGIN"
+
+        # NetSuite with SAME_AS_ORIGIN must raise ValueError
+        netsuite_cfg = {
+            "task_id": "test_netsuite",
+            "source": {"type": "netsuite"},
+            "destination": {"format": "SAME_AS_ORIGIN"},
+        }
+        with pytest.raises(ValueError, match="only allowed for Atlas"):
+            _normalize_config(netsuite_cfg)
+
+        # Primavera P6 with SAME_AS_ORIGIN must raise ValueError
+        p6_cfg = {
+            "task_id": "test_p6",
+            "source": {"type": "p6"},
+            "destination": {"format": "SAME_AS_ORIGIN"},
+        }
+        with pytest.raises(ValueError, match="only allowed for Atlas"):
+            _normalize_config(p6_cfg)
 
     def test_create_udp_dag_structure(self):
         sample_cfg = {
@@ -116,9 +162,9 @@ class TestUDPDagFactory:
             "destination": {
                 "format": "PARQUET",
                 "schema_strategy": "static",
-                "gcs_bucket": "bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw",
+                "gcs_bucket": "bkt-elementl-509009-udp-bronze-raw",
                 "gcs_prefix": "netsuite/raw/netsuite_account/dt={{ ds }}/",
-                "bq_project": "pid-nse-stg-core-apps-k8ti",
+                "bq_project": "elementl-509009",
                 "bq_dataset": "ds_bronze_netsuite",
                 "bq_table": "netsuite_account",
                 "write_disposition": "WRITE_TRUNCATE",

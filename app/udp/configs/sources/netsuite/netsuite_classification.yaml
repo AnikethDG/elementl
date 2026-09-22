@@ -12,18 +12,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+template: ingestion_task_metadata
+version: '1.0'
 task_id: netsuite_classification
-source_system: netsuite
-ingestion_job: suiteql-ingestion
-source_table: classification
-primary_key: id
-watermark_column: lastmodifieddate
-sample_where_clause: "ROWNUM <= 20"
-target_dataset: ds_bronze_netsuite
-target_table: netsuite_classification
-silver_dataset: ds_silver_netsuite
-silver_table: stg_netsuite_classification
-dataform_tags:
-  - netsuite
-  - netsuite_classification
-schedule: "@daily"
+display_name: "NetSuite Financial Classifications Master"
+description: "Ingests organizational classifications, cost centers, and tracking classes."
+domain: "finance"
+metadata_status: Active
+
+source:
+  type: netsuite
+  load_type: full_refresh
+  watermark_column: lastmodifieddate
+  connection_secret_id: "secret-netsuite-api-config"
+  extraction_type: suiteql
+  source_table: classification
+  primary_key: id
+  where_clause: "ROWNUM <= 10"
+  max_records: 10
+  page_size: 1000
+  timeout_seconds: 300
+  query: "SELECT * FROM classification WHERE ROWNUM <= 10"
+
+engine:
+  type: cloud_run_job
+  job_name: suiteql-ingestion
+  timeout_seconds: 1800
+
+destination:
+  format: PARQUET
+  schema_strategy: static
+  gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
+  gcs_prefix: "netsuite/raw/netsuite_classification/dt={{ ds }}/"
+  bq_project: "elementl-509009"
+  bq_dataset: "ds_bronze_netsuite"
+  bq_table: "netsuite_classification"
+  write_disposition: WRITE_TRUNCATE
+  partition_field: ingestion_date
+  cluster_fields:
+    - id
+
+orchestration:
+  dag_id: dag_udp_netsuite_classification
+  schedule: "@daily"
+  start_date: "2024-01-01 00:00:00"
+  catchup: false
+  retries: 2
+  retry_delay_minutes: 5
+  concurrency: 1
+  dag_tags:
+    - "source:netsuite"
+    - "engine:cloud_run_job"
+    - "zone:raw"
+  dataform:
+    enabled: true
+    target_dataset: "ds_silver"
+    target_table: "stg_netsuite_classification"
+    included_tags:
+      - "netsuite"
+      - "netsuite_classification"
+    transitive_dependencies_included: false

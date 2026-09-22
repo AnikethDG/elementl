@@ -21,6 +21,7 @@ Parquet / JSONL.
 
 import io
 import os
+import csv
 import json
 import logging
 import datetime
@@ -178,7 +179,46 @@ class BaseExtractor(ABC):
             pq.write_table(table, buffer, compression="snappy")
             data_bytes = buffer.getvalue()
             content_type = "application/octet-stream"
-        elif fmt in {"json", "jsonl", "ndjson"}:
+        elif fmt == "csv":
+            filename = f"{prefix}/data_{timestamp_str}.csv"
+            fieldnames: List[str] = []
+            seen_fields = set()
+            for r in cleaned_records:
+                for k in r.keys():
+                    if k not in seen_fields:
+                        seen_fields.add(k)
+                        fieldnames.append(k)
+
+            str_buffer = io.StringIO()
+            writer = csv.DictWriter(str_buffer, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
+            writer.writeheader()
+            for r in cleaned_records:
+                row = {}
+                for k in fieldnames:
+                    val = r.get(k)
+                    if val is None:
+                        row[k] = ""
+                    elif isinstance(val, (dict, list)):
+                        row[k] = json.dumps(val, default=str)
+                    elif isinstance(val, (datetime.date, datetime.datetime)):
+                        row[k] = val.isoformat()
+                    elif isinstance(val, bool):
+                        row[k] = str(val).lower()
+                    else:
+                        row[k] = str(val)
+                writer.writerow(row)
+            data_bytes = str_buffer.getvalue().encode("utf-8")
+            content_type = "text/csv"
+        elif fmt in {
+            "json",
+            "jsonl",
+            "ndjson",
+            "tabular_jsonl",
+            "geojson_ndjson",
+            "same_as_origin",
+            "same as origin",
+            "origin",
+        }:
             filename = f"{prefix}/data_{timestamp_str}.json"
             payload = "\n".join(json.dumps(r, default=str) for r in cleaned_records)
             data_bytes = (payload + "\n").encode("utf-8")

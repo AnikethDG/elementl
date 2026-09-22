@@ -412,6 +412,34 @@ During deployment and testing on Composer v3 / Airflow 3, the following technica
 
 ---
 
+### 5. Composer v3 Verification Run (2026-09-22)
+
+Following the implementation of dynamic destination format support (`PARQUET`, `CSV`, `JSON`, and `SAME_AS_ORIGIN` which is strictly restricted to Atlas sources), live end-to-end testing was executed and verified on Google Cloud Composer v3 (`composer-v3-east`) in project `elementl-509009`.
+
+#### Run 1: Initial Sample DAG Verification
+| # | System | DAG ID | Run ID | Duration | State | GCS Bronze Output (dt=2026-09-22) | BQ Bronze Table | Rows | Table Size |
+| :- | :- | :- | :- | :- | :- | :- | :- | :- | :- |
+| 1 | **Atlas** | `dag_udp_atlas_s1_02_urban_areas` | `manual__2026-09-22T05:52:35.702968+00:00` | 1m 45s | **SUCCESS** | `data_20260922_055527.parquet` (939 KB), `part_*.jsonl.gz` (292 KB) | `ds_bronze_atlas.atlas_s1_02_urban_areas` | 10 | 1,823,135 B |
+| 2 | **NetSuite** | `dag_udp_netsuite_department` | `manual__2026-09-22T05:52:37.422229+00:00` | 1m 45s | **SUCCESS** | `data_20260922_055527.parquet` (3.2 KB) | `ds_bronze_netsuite.netsuite_department` | 5 | 252 B |
+| 3 | **P6** | `dag_udp_p6_project` | `manual__2026-09-22T05:52:38.973664+00:00` | 1m 30s | **SUCCESS** | `20260922T055526Z.parquet` (3.5 KB) | `ds_bronze_p6.p6_project` | 3 | 540 B |
+
+#### Run 2: Re-Test with Native `SAME_AS_ORIGIN` Format (Atlas Native Origin Verification)
+| # | System | DAG ID | Run ID | Duration | State | GCS Bronze Output (dt=2026-09-22) | BQ Bronze Table | Rows | Table Size |
+| :- | :- | :- | :- | :- | :- | :- | :- | :- | :- |
+| 1 | **Atlas (`SAME_AS_ORIGIN`)** | `dag_udp_sample_atlas_same_as_origin` | `manual__2026-09-22T06:20:19.044053+00:00` | 4m 44s | **SUCCESS** | `_manifest.json` (576 B), `part_*.jsonl.gz` (2,046 B), `data_*.parquet` (18.2 KB) | `ds_bronze_atlas.sample_atlas_same_as_origin` | 20 | 47,148 B |
+| 2 | **NetSuite** | `dag_udp_netsuite_department` | `manual__2026-09-22T06:10:16.032938+00:00` | 4m 03s | **SUCCESS** | `data_20260922_061316.parquet` (3.2 KB) | `ds_bronze_netsuite.netsuite_department` | 10 | 504 B |
+| 3 | **P6** | `dag_udp_p6_project` | `manual__2026-09-22T06:10:18.333862+00:00` | 3m 48s | **SUCCESS** | `20260922T061315Z.parquet` (3.5 KB) | `ds_bronze_p6.p6_project` | 6 | 1,080 B |
+
+**Task-Level Execution Matrix (`dag_udp_sample_atlas_same_as_origin`):**
+- `ingestion_group.execute_arcgis_ingestion`: **success** (preserves raw GeoJSON envelope to GCS and strongly-typed Parquet)
+- `ingestion_group.load_gcs_to_bq_bronze`: **success** (loads into `ds_bronze_atlas.sample_atlas_same_as_origin`)
+- `dataform_group.compile_dataform`: **success**
+- `dataform_group.invoke_silver_and_assertions`: **success**
+
+---
+
 ## 🎯 Final Operational Sign-Off
-All 3 sample DAGs (`dag_udp_atlas_s1_02_urban_areas`, `dag_udp_netsuite_department`, and `dag_udp_p6_project`) are 100% verified and operational on Google Cloud Composer v3 (`composer-v3-east`, Apache Airflow 3.3.1). All test DAGs have been paused (`is_paused=True`) to prevent unneeded scheduling or compute costs.
+All sample DAGs across the three source families (`dag_udp_sample_atlas_same_as_origin` with `SAME_AS_ORIGIN`, `dag_udp_atlas_s1_02_urban_areas`, `dag_udp_netsuite_department`, and `dag_udp_p6_project`) are 100% verified and operational on Google Cloud Composer v3 (`composer-v3-east`, Apache Airflow 3.3.1) in project `elementl-509009`. All DAGs have been safely paused (`is_paused=True`) to prevent unneeded scheduling or compute costs.
+
+
 

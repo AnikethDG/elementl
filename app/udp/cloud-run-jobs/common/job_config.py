@@ -118,8 +118,8 @@ class JobConfig:
             gcs_prefix=_env("GCS_PREFIX"),
             destination_format=_env("DESTINATION_FORMAT", "parquet").lower(),
             audit_project=_env("AUDIT_PROJECT"),
-            audit_dataset=_env("AUDIT_DATASET"),
-            audit_table=_env("AUDIT_TABLE"),
+            audit_dataset=_env("AUDIT_DATASET") or "ds_operations",
+            audit_table=_env("AUDIT_TABLE") or "ingestion_execution_logs",
             target_dataset=_env("TARGET_DATASET"),
             target_table=_env("TARGET_TABLE"),
         )

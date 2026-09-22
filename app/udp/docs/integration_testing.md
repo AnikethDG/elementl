@@ -1,6 +1,6 @@
 # Integration Testing Guide: Elementl Unified Data Platform (UDP)
 
-This guide documents the integration testing architecture, operational workflows, and validation procedures for the Elementl UDP ingestion framework against Google Cloud Platform project `pid-nse-stg-core-apps-k8ti`.
+This guide documents the integration testing architecture, operational workflows, and validation procedures for the Elementl UDP ingestion framework against Google Cloud Platform project `elementl-509009`.
 
 ---
 
@@ -11,7 +11,7 @@ The integration test suite validates that the entire end-to-end data ingestion s
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                                 Google Cloud Platform                                  │
-│                               Project: pid-nse-stg-core-apps-k8ti                                 │
+│                               Project: elementl-509009                                 │
 │                                                                                        │
 │  ┌─────────────────────────────────┐        ┌───────────────────────────────────────┐  │
 │  │   Cloud Storage: Configs        │        │   Cloud Composer 2 (Airflow)          │  │
@@ -53,14 +53,14 @@ Integration testing verifies live cloud infrastructure deployed in `us-central1`
 
 | Component | Target Resource ID | Purpose |
 | :--- | :--- | :--- |
-| **GCP Project** | `pid-nse-stg-core-apps-k8ti` | Dedicated sandbox and ingestion test project. |
-| **Bronze GCS Bucket** | `bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw` | Object landing lake storing raw Snappy Parquet files and job manifests. |
-| **Configs GCS Bucket**| `bkt-pid-nse-stg-core-apps-k8ti-udp-configs` | Storage bucket holding all 30 source YAML configurations. |
-| **NetSuite Bronze** | `pid-nse-stg-core-apps-k8ti.ds_bronze_netsuite` | BigQuery landing tables for 11 NetSuite SuiteQL entities. |
-| **Primavera P6 Bronze**| `pid-nse-stg-core-apps-k8ti.ds_bronze_p6` | BigQuery landing tables for 15 Primavera P6 Oracle entities. |
-| **Atlas Bronze** | `pid-nse-stg-core-apps-k8ti.ds_bronze_atlas` | BigQuery landing tables for USGS, Census, and ArcGIS layers. |
-| **Silver Staging** | `pid-nse-stg-core-apps-k8ti.ds_silver` | Dataform transformation target dataset. |
-| **Operations / Audit**| `pid-nse-stg-core-apps-k8ti.ds_operations` | Central telemetry (`ingestion_execution_logs`) and watermarks. |
+| **GCP Project** | `elementl-509009` | Dedicated sandbox and ingestion test project. |
+| **Bronze GCS Bucket** | `bkt-elementl-509009-udp-bronze-raw` | Object landing lake storing raw Snappy Parquet files and job manifests. |
+| **Configs GCS Bucket**| `bkt-elementl-509009-udp-configs` | Storage bucket holding all 30 source YAML configurations. |
+| **NetSuite Bronze** | `elementl-509009.ds_bronze_netsuite` | BigQuery landing tables for 11 NetSuite SuiteQL entities. |
+| **Primavera P6 Bronze**| `elementl-509009.ds_bronze_p6` | BigQuery landing tables for 15 Primavera P6 Oracle entities. |
+| **Atlas Bronze** | `elementl-509009.ds_bronze_atlas` | BigQuery landing tables for USGS, Census, and ArcGIS layers. |
+| **Silver Staging** | `elementl-509009.ds_silver` | Dataform transformation target dataset. |
+| **Operations / Audit**| `elementl-509009.ds_operations` | Central telemetry (`ingestion_execution_logs`) and watermarks. |
 | **Artifact Registry** | `udp-ingestion-jobs` | Docker repository storing worker images built via Cloud Build. |
 | **Cloud Run Jobs** | `suiteql-ingestion`, `jdbc-ingestion`, `arcgis-ingestion`, `bulk-ingestion` | Serverless ingestion batch jobs. |
 | **Cloud Composer 2** | `composer-elementl-dev` | Private IP Airflow 2 orchestration cluster in custom VPC. |
@@ -74,7 +74,7 @@ Verify that your active user has the necessary roles (`roles/bigquery.admin`, `r
 ```bash
 gcloud auth login
 gcloud auth application-default login
-gcloud config set project pid-nse-stg-core-apps-k8ti
+gcloud config set project elementl-509009
 ```
 
 ### 2. Verify Cloud Resource Attribution
@@ -140,7 +140,7 @@ When the integration tests pass, the following invariants are guaranteed:
 
 1. **Isolation & Medallion Alignment**:
    - Upstream raw data never writes directly to silver or gold datasets.
-   - Raw records land strictly in `gs://bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw/<source>/raw/<task>/dt=<date>/data_<timestamp>.parquet`.
+   - Raw records land strictly in `gs://bkt-elementl-509009-udp-bronze-raw/<source>/raw/<task>/dt=<date>/data_<timestamp>.parquet`.
    - Bronze BigQuery tables strictly reside in `ds_bronze_netsuite`, `ds_bronze_p6`, or `ds_bronze_atlas`.
 2. **NetSuite Safety Cap**:
    - Every NetSuite extraction enforces a hard ceiling of at most 10 records per execution.
@@ -149,7 +149,7 @@ When the integration tests pass, the following invariants are guaranteed:
    - Every execution logs an audit telemetry row in BigQuery `ds_operations.ingestion_execution_logs`.
    - Incremental extraction state is safely maintained in `ds_operations.ingestion_watermarks`.
 4. **Dynamic Pipeline Scalability**:
-   - Adding a new source table requires only adding a declarative YAML file to `gs://bkt-pid-nse-stg-core-apps-k8ti-udp-configs/sources/`. The Airflow DAG Factory automatically discovers it and instantiates the pipeline.
+   - Adding a new source table requires only adding a declarative YAML file to `gs://bkt-elementl-509009-udp-configs/sources/`. The Airflow DAG Factory automatically discovers it and instantiates the pipeline.
 
 ---
 

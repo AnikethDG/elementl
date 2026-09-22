@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,7 +42,7 @@ for mod_name in ["jwt", "oracledb", "urllib3.util.retry"]:
         except ImportError:
             sys.modules[mod_name] = MagicMock()
 
-DEFAULT_PROJECT_ID = "pid-nse-stg-core-apps-k8ti"
+DEFAULT_PROJECT_ID = "elementl-509009"
 DEFAULT_REGION = "us-central1"
 
 

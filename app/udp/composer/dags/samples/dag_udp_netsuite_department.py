@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,9 +24,9 @@ from airflow.providers.google.cloud.operators.dataform import (
 from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
 from airflow.utils.task_group import TaskGroup
 
-PROJECT_ID = "pid-nse-stg-core-apps-k8ti"
+PROJECT_ID = "elementl-509009"
 REGION = "us-central1"
-RAW_BUCKET = "bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw"
+RAW_BUCKET = "bkt-elementl-509009-udp-bronze-raw"
 DATAFORM_REPO = "gcp-dataform-transformations"
 DATAFORM_SA = f"sa-data-transform@{PROJECT_ID}.iam.gserviceaccount.com"
 

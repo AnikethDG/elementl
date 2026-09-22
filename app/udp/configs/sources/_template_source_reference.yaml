@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,7 +24,7 @@
 #   3. Select the target execution engine (Cloud Run Job: suiteql, jdbc, arcgis, bulk)
 #   4. Configure the destination landing parameters (GCS Bronze raw lake & BigQuery Bronze dataset)
 #   5. Define scheduling and operational SLA tags in the orchestration block
-#   6. Deploy the YAML to gs://bkt-pid-nse-stg-core-apps-k8ti-udp-configs/sources/ or commit locally
+#   6. Deploy the YAML to gs://bkt-elementl-509009-udp-configs/sources/ or commit locally
 #   7. Cloud Composer Airflow Dynamic DAG Factory automatically generates the DAG
 # ==============================================================================
 
@@ -103,18 +103,18 @@ engine:
 # 4. DESTINATION CONFIGURATION
 # ------------------------------------------------------------------------------
 destination:
-  # Landing file format: PARQUET | JSONL | CSV
+  # Landing file format: PARQUET | CSV | JSON | SAME_AS_ORIGIN (Allowed ONLY for Atlas sources)
   format: PARQUET
 
   # Schema management strategy: static | generic_envelope
   schema_strategy: static
 
   # Landing GCS target location
-  gcs_bucket: "bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw"
+  gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
   gcs_prefix: "netsuite/raw/netsuite_department/dt={{ ds }}/"
 
   # Target BigQuery Bronze destination
-  bq_project: "pid-nse-stg-core-apps-k8ti"
+  bq_project: "elementl-509009"
   bq_dataset: "ds_bronze_netsuite"        # ds_bronze_netsuite | ds_bronze_p6 | ds_bronze_atlas
   bq_table: "netsuite_department"
 
@@ -159,7 +159,7 @@ orchestration:
   # Downstream Dataform Silver transformation configuration
   dataform:
     enabled: true
-    target_dataset: "silver_udp"
+    target_dataset: "ds_silver"
     target_table: "stg_netsuite_department"
     included_tags:
       - "netsuite"

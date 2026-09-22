@@ -14,11 +14,12 @@
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    dir: 'app/udp/cloud-run-jobs/bulk-ingestion'
     args:
       - 'build'
+      - '-f'
+      - 'bulk-ingestion/Dockerfile'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/bulk-ingestion:${SHORT_SHA}'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/bulk-ingestion:${_TAG}'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/bulk-ingestion:latest'
       - '.'
@@ -34,9 +35,10 @@ steps:
       - 'jobs'
       - 'update'
       - 'bulk-ingestion'
-      - '--image=${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/bulk-ingestion:${SHORT_SHA}'
+      - '--image=${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/bulk-ingestion:latest'
       - '--region=${_REGION}'
       - '--project=${_TARGET_PROJECT_ID}'
 substitutions:
   _REGION: 'us-central1'
-  _TARGET_PROJECT_ID: 'pid-nse-stg-core-apps-k8ti'
+  _TARGET_PROJECT_ID: 'elementl-509009'
+  _TAG: 'latest'

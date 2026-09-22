@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,7 @@ import importlib
 import pytest
 from unittest.mock import MagicMock, patch
 
-suiteql_mod = importlib.import_module("suiteql-ingestion.main")
+suiteql_mod = importlib.import_module("suiteQL-ingestion.main")
 _normalise_account_id = suiteql_mod._normalise_account_id
 _max_records = suiteql_mod._max_records
 HARD_MAX_RECORDS_CEILING = suiteql_mod.HARD_MAX_RECORDS_CEILING
@@ -82,3 +82,21 @@ class TestSuiteQLExtractor:
             )
             assert len(rows) == 10
             assert all("links" not in r for r in rows)
+
+    def test_same_as_origin_rejected_for_suiteql(self):
+        extractor = NetSuiteExtractor()
+        config = MagicMock()
+        config.destination_format = "SAME_AS_ORIGIN"
+        config.execution_date = "2026-09-22"
+        config.gcs_bucket = "test-bucket"
+        config.gcs_prefix = "test/prefix"
+        config.audit_project = None
+        config.target_dataset = None
+        config.query = "SELECT id FROM department"
+
+        with patch.object(extractor, "get_secret", return_value='{"account_id": "123", "client_id": "cid", "certificate_id": "c", "private_key_pem": "p"}'):
+            with patch.object(extractor, "_get_token", return_value="token"):
+                with patch.object(extractor, "_query", return_value=[{"id": "1"}]):
+                    with pytest.raises(ValueError, match="only allowed for Atlas"):
+                        extractor.extract(config)
+

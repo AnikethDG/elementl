@@ -739,7 +739,7 @@ footer{
 </li>
 <li>
 <p><strong>Dual-Path Configuration Discovery</strong>:
-   * <strong>Path 1 (Primary - GCS Cloud Bucket)</strong>: Scans <code>gs://&lt;GCS_CONFIG_BUCKET&gt;/sources/</code> (e.g. <code>gs://bkt-pid-nse-stg-core-apps-k8ti-udp-configs/sources/</code>). It downloads and parses all <code>.yaml</code> files.
+   * <strong>Path 1 (Primary - GCS Cloud Bucket)</strong>: Scans <code>gs://&lt;GCS_CONFIG_BUCKET&gt;/sources/</code> (e.g. <code>gs://bkt-elementl-509009-udp-configs/sources/</code>). It downloads and parses all <code>.yaml</code> files.
    * <strong>Path 2 (Fallback - Local Filesystem)</strong>: Scans local directories (<code>app/udp/configs/sources/</code> or <code>/home/airflow/gcs/dags/configs/sources/</code>).
    * Deduplication ensures each <code>task_id</code> is loaded only once per scheduler evaluation.</p>
 </li>
@@ -757,7 +757,7 @@ footer{
   To add a new table pipeline to the platform, <strong>no code needs to be written or deployed, and Airflow does not need to be restarted</strong>.
   An engineer or automated script simply saves a new YAML file into the GCS bucket:
   <code>bash
-  gcloud storage cp new_table.yaml gs://bkt-pid-nse-stg-core-apps-k8ti-udp-configs/sources/netsuite/</code>
+  gcloud storage cp new_table.yaml gs://bkt-elementl-509009-udp-configs/sources/netsuite/</code>
   Within 30–60 seconds, the Airflow scheduler reads the new file from GCS, constructs the DAG, and renders it in the Composer UI ready for scheduling.</li>
 <li><strong>Updating Pipelines</strong>:
   Modifying <code>schedule</code>, <code>where_clause</code>, <code>max_records</code>, or <code>dataform_tags</code> in the GCS YAML immediately updates the active DAG on the next scheduler parse cycle.</li>
@@ -964,7 +964,7 @@ footer{
 <tbody>
 <tr>
 <td style="text-align: left;"><strong><code>{raw_landing_bucket}</code></strong></td>
-<td style="text-align: left;"><code>bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw</code></td>
+<td style="text-align: left;"><code>bkt-elementl-509009-udp-bronze-raw</code></td>
 <td style="text-align: left;">GCS Bucket resolved dynamically from <code>environments/*.json</code> (<code>raw_landing_bucket</code>) or <code>RAW_BUCKET_NAME</code>. Decoupled from table YAMLs for multi-environment portability.</td>
 </tr>
 <tr>
@@ -1046,8 +1046,8 @@ footer{
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><code>suiteql-ingestion/</code></td>
-<td style="text-align: left;"><code>udp-ingestion-jobs/suiteql-ingestion</code></td>
+<td style="text-align: left;"><code>suiteQL-ingestion/</code></td>
+<td style="text-align: left;"><code>udp-ingestion-jobs/suiteQL-ingestion</code></td>
 <td style="text-align: left;">NetSuite ERP</td>
 <td style="text-align: left;">SuiteQL REST API via OAuth 2.0 M2M JWT</td>
 </tr>
@@ -1154,7 +1154,7 @@ footer{
 <hr />
 <h2 id="6-centralized-common-core-library">6. Centralized <code>common/</code> Core Library<a class="anchor" href="#6-centralized-common-core-library" aria-label="Link to section">#</a></h2>
 <h3 id="why-this-folder-exists">Why This Folder Exists<a class="anchor" href="#why-this-folder-exists" aria-label="Link to section">#</a></h3>
-<p>In early iterations, each Cloud Run job (<code>suiteql-ingestion</code>, <code>jdbc-ingestion</code>, <code>arcgis-ingestion</code>, <code>bulk-ingestion</code>) duplicated utility code in its own <code>common/</code> subfolder. This violated DRY principles and created code drift risk.</p>
+<p>In early iterations, each Cloud Run job (<code>suiteQL-ingestion</code>, <code>jdbc-ingestion</code>, <code>arcgis-ingestion</code>, <code>bulk-ingestion</code>) duplicated utility code in its own <code>common/</code> subfolder. This violated DRY principles and created code drift risk.</p>
 <p>All shared logic has been <strong>consolidated into a single source of truth</strong>:
 <a class="repo-link" href="../../../app/udp/cloud-run-jobs/common/"><code>app/udp/cloud-run-jobs/common/</code></a></p>
 <h3 id="core-modules-breakdown">Core Modules Breakdown<a class="anchor" href="#core-modules-breakdown" aria-label="Link to section">#</a></h3>
@@ -1179,14 +1179,14 @@ footer{
 <span class="k">WORKDIR</span><span class="w"> </span><span class="s">/app</span>
 
 <span class="c"># Copy dependencies and install</span>
-<span class="k">COPY</span><span class="w"> </span>suiteql-ingestion/requirements.txt<span class="w"> </span>requirements.txt
+<span class="k">COPY</span><span class="w"> </span>suiteQL-ingestion/requirements.txt<span class="w"> </span>requirements.txt
 <span class="k">RUN</span><span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--no-cache-dir<span class="w"> </span>-r<span class="w"> </span>requirements.txt
 
 <span class="c"># Copy centralized common core</span>
 <span class="k">COPY</span><span class="w"> </span>common/<span class="w"> </span>common/
 
 <span class="c"># Copy job-specific implementation</span>
-<span class="k">COPY</span><span class="w"> </span>suiteql-ingestion/main.py<span class="w"> </span>main.py
+<span class="k">COPY</span><span class="w"> </span>suiteQL-ingestion/main.py<span class="w"> </span>main.py
 
 <span class="k">ENTRYPOINT</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;python3&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;main.py&quot;</span><span class="p">]</span>
 </code></pre></div>
@@ -1198,9 +1198,9 @@ footer{
 <span class="w">    </span><span class="nt">args</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;build&#39;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;-f&#39;</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;suiteql-ingestion/Dockerfile&#39;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;suiteQL-ingestion/Dockerfile&#39;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;-t&#39;</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteql-ingestion:${SHORT_SHA}&#39;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteQL-ingestion:${SHORT_SHA}&#39;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;.&#39;</span>
 </code></pre></div>
 
@@ -1226,7 +1226,7 @@ footer{
    max_records: 10</code></li>
 <li><strong>Job Configuration Level (<code>common/job_config.py</code> &amp; <code>common/base_extractor.py</code>)</strong>:
    The runtime configuration enforces <code>max_records &lt;= 10</code> for NetSuite tasks, defaulting to 10 if an override attempts to request more.</li>
-<li><strong>Job Extractor Query Rewriter Level (<code>suiteql-ingestion/main.py</code>)</strong>:
+<li><strong>Job Extractor Query Rewriter Level (<code>suiteQL-ingestion/main.py</code>)</strong>:
    The query rewriter automatically detects and injects <code>ROWNUM &lt;= 10</code>:
    <code>python
    def _apply_row_limit(query: str, max_records: int) -&gt; str:
@@ -1539,8 +1539,8 @@ This repository (<code>elementl-data-ingestion-fw</code>) acts as the <strong>In
 <li><strong>GCS Parquet &amp; BigQuery Landing</strong>: Confirms Snappy Parquet landed in GCS Bronze, rows appended into <code>ds_bronze_*</code> BigQuery table, and audit row inserted into <code>ds_operations.ingestion_execution_logs</code>.</li>
 </ol>
 <h3 id="deploying-cloud-run-services">Deploying Cloud Run Services<a class="anchor" href="#deploying-cloud-run-services" aria-label="Link to section">#</a></h3>
-<div class="chl"><button class="copy-btn" type="button">Copy</button><pre><span></span><code><span class="c1"># Build and deploy a Cloud Run Job (e.g. suiteql-ingestion)</span>
-gcloud<span class="w"> </span>builds<span class="w"> </span>submit<span class="w">   </span>--config<span class="o">=</span>app/udp/cloud-run-jobs/suiteql-ingestion/cloud_build.yaml<span class="w">   </span>app/udp/cloud-run-jobs
+<div class="chl"><button class="copy-btn" type="button">Copy</button><pre><span></span><code><span class="c1"># Build and deploy a Cloud Run Job (e.g. suiteQL-ingestion)</span>
+gcloud<span class="w"> </span>builds<span class="w"> </span>submit<span class="w">   </span>--config<span class="o">=</span>app/udp/cloud-run-jobs/suiteQL-ingestion/cloud_build.yaml<span class="w">   </span>app/udp/cloud-run-jobs
 </code></pre></div>
 
 <h3 id="onboarding-a-new-source-table-step-by-step">Onboarding a New Source Table (Step-by-Step)<a class="anchor" href="#onboarding-a-new-source-table-step-by-step" aria-label="Link to section">#</a></h3>

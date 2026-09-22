@@ -12,17 +12,68 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+template: ingestion_task_metadata
+version: '1.0'
 task_id: atlas_s1_06_quaternary_faults
-source_system: atlas
-layer_id: "S1-06"
-ingestion_job: arcgis-ingestion
-endpoint_url: "https://earthquake.usgs.gov/arcgis/rest/services/haz/Qfaults/MapServer"
-unpack_zip_to_envelope_schema: true
-target_dataset: ds_bronze_atlas
-target_table: atlas_s1_06_quaternary_faults
-silver_dataset: ds_silver_atlas
-silver_table: stg_atlas_s1_06_quaternary_faults
-dataform_tags:
-  - atlas
-  - atlas_s1_06_quaternary_faults
-schedule: "@weekly"
+display_name: "USGS Quaternary Fault and Fold Database (Capable Faults)"
+description: "Ingests nationwide Quaternary active fault and fold traces from USGS Earthquake Hazards Program ArcGIS REST MapServer serving Criterion S1-06 (Capable faults buffer)."
+domain: "geohazards_seismic"
+metadata_status: Active
+
+source:
+  type: atlas
+  category: arcgis_rest
+  format: geojson_ndjson
+  load_type: full_refresh
+  connection:
+    endpoint_url: "https://earthquake.usgs.gov/arcgis/rest/services/haz/Qfaults/MapServer"
+    layer_id: 21
+    auth_type: none
+    query_params:
+      where: "1=1"
+      outFields: "*"
+    timeout_seconds: 180
+    max_retries: 5
+
+engine:
+  type: cloud_run_job
+  job_name: arcgis-ingestion
+  timeout_seconds: 3600
+
+destination:
+  format: GEOJSON_NDJSON
+  schema_strategy: generic_envelope
+  domain_tags:
+    - "S1-06"
+    - "capable_faults"
+    - "exclusionary"
+  unpack_archive: false
+  gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
+  gcs_prefix: "atlas/raw/atlas_s1_06_quaternary_faults/dt={{ ds }}/"
+  bq_project: "elementl-509009"
+  bq_dataset: "ds_bronze_atlas"
+  bq_table: "atlas_s1_06_quaternary_faults"
+  write_disposition: WRITE_TRUNCATE
+  partition_field: ingestion_date
+
+orchestration:
+  dag_id: dag_udp_atlas_s1_06_quaternary_faults
+  schedule: "@weekly"
+  start_date: "2024-01-01 00:00:00"
+  catchup: false
+  retries: 2
+  retry_delay_minutes: 5
+  concurrency: 1
+  dag_tags:
+    - "source:atlas"
+    - "engine:cloud_run_job"
+    - "zone:raw"
+    - "criteria:s1_06"
+  dataform:
+    enabled: true
+    target_dataset: "ds_silver"
+    target_table: "stg_atlas_s1_06_quaternary_faults"
+    included_tags:
+      - "atlas"
+      - "atlas_s1_06_quaternary_faults"
+    transitive_dependencies_included: false

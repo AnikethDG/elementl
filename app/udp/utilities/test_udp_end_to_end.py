@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 import yaml
 import requests
 
-PROJECT_ID = "pid-nse-stg-core-apps-k8ti"
+PROJECT_ID = "elementl-509009"
 GCS_CONFIG_BUCKET = f"bkt-{PROJECT_ID}-udp-configs"
 GCS_RAW_BUCKET = f"bkt-{PROJECT_ID}-udp-bronze-raw"
 INGESTION_FUNCTION_URL = "https://udp-ingestion-function-506270750194.us-central1.run.app/ingest"

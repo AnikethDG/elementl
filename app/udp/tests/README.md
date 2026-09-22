@@ -1,6 +1,6 @@
 # Elementl Unified Data Platform (UDP) Test Suite
 
-This directory contains the automated test suite for the Elementl UDP data ingestion framework, structured into **Unit Tests** (fast, isolated, mock-driven) and **Integration Tests** (live validation against Google Cloud Platform project `pid-nse-stg-core-apps-k8ti`).
+This directory contains the automated test suite for the Elementl UDP data ingestion framework, structured into **Unit Tests** (fast, isolated, mock-driven) and **Integration Tests** (live validation against Google Cloud Platform project `elementl-509009`).
 
 For detailed documentation and architecture guides, refer to:
 - 📖 [**Unit Testing Guide (`app/udp/docs/unit_testing.md`)**](file:///usr/local/google/home/anikethd/elementl/ELEMENTL/elementl-data-ingestion-fw/app/udp/docs/unit_testing.md): Testing methodology, mock strategies, fail-fast validations, and CI pipeline rules.
@@ -22,7 +22,7 @@ app/udp/tests/
 │   ├── test_job_config.py          # JobConfig validation, fail-fast rules, Jinja check
 │   ├── test_suiteql_extractor.py   # NetSuite <=10 cap enforcement, HATEOAS links removal
 │   └── test_udp_dag_factory.py     # Local YAML discovery and dynamic Airflow DAG generation
-├── integration/                    # Live GCP integration tests against project pid-nse-stg-core-apps-k8ti
+├── integration/                    # Live GCP integration tests against project elementl-509009
 │   ├── test_gcs_landing.py         # Bronze Raw lake & Config bucket existence, read/write/delete
 │   ├── test_bigquery_datasets.py   # ds_bronze_*, ds_silver, ds_operations schemas & partitioning
 │   ├── test_audit_logging.py       # Live telemetry insert/query & watermark state persistence
@@ -43,11 +43,11 @@ app/udp/tests/
    ```
 
 2. **GCP Authentication (Required for Integration Tests)**:
-   Ensure your active gcloud session or Application Default Credentials (ADC) has access to `pid-nse-stg-core-apps-k8ti`:
+   Ensure your active gcloud session or Application Default Credentials (ADC) has access to `elementl-509009`:
    ```bash
    gcloud auth login
    gcloud auth application-default login
-   gcloud config set project pid-nse-stg-core-apps-k8ti
+   gcloud config set project elementl-509009
    ```
 
 ---
@@ -69,7 +69,7 @@ Unit tests are fast, fully mocked, and require no GCP credentials, network conne
 
 ## Running Integration Tests
 
-Integration tests validate deployed infrastructure, permissions, and live operations directly in project `pid-nse-stg-core-apps-k8ti`.
+Integration tests validate deployed infrastructure, permissions, and live operations directly in project `elementl-509009`.
 
 ### 1. Run All Integration Tests
 ```bash
@@ -88,7 +88,7 @@ Integration tests validate deployed infrastructure, permissions, and live operat
   ```bash
   .venv/bin/python3 -m pytest -v app/udp/tests/integration/test_gcs_landing.py
   ```
-  *Validates `bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw` and `bkt-pid-nse-stg-core-apps-k8ti-udp-configs/sources/`.*
+  *Validates `bkt-elementl-509009-udp-bronze-raw` and `bkt-elementl-509009-udp-configs/sources/`.*
 
 - **Audit Telemetry & Watermarks**:
   ```bash
@@ -100,7 +100,7 @@ Integration tests validate deployed infrastructure, permissions, and live operat
   ```bash
   .venv/bin/python3 -m pytest -v app/udp/tests/integration/test_cloud_run_jobs.py
   ```
-  *Verifies all 4 jobs are deployed with images from `us-central1-docker.pkg.dev/pid-nse-stg-core-apps-k8ti/udp-ingestion-jobs/` and executes a smoke test run.*
+  *Verifies all 4 jobs are deployed with images from `us-central1-docker.pkg.dev/elementl-509009/udp-ingestion-jobs/` and executes a smoke test run.*
 
 - **Cloud Composer Environment & DAG Sync**:
   ```bash
@@ -114,8 +114,8 @@ Integration tests validate deployed infrastructure, permissions, and live operat
 
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
-| `GCP_PROJECT_ID` | `pid-nse-stg-core-apps-k8ti` | Target GCP project for integration testing. |
+| `GCP_PROJECT_ID` | `elementl-509009` | Target GCP project for integration testing. |
 | `GCP_REGION` | `us-central1` | Target GCP region for Cloud Run, Composer, and BigQuery. |
-| `RAW_BUCKET_NAME` | `bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw` | GCS landing bucket for bronze parquet files. |
-| `GCS_CONFIG_BUCKET` | `bkt-pid-nse-stg-core-apps-k8ti-udp-configs` | GCS bucket containing declarative YAML configurations. |
+| `RAW_BUCKET_NAME` | `bkt-elementl-509009-udp-bronze-raw` | GCS landing bucket for bronze parquet files. |
+| `GCS_CONFIG_BUCKET` | `bkt-elementl-509009-udp-configs` | GCS bucket containing declarative YAML configurations. |
 | `COMPOSER_ENV_NAME`| `composer-elementl-dev` | Target Cloud Composer 2 instance name. |

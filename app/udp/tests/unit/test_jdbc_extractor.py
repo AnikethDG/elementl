@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@ jdbc_mod = importlib.import_module("jdbc-ingestion.main")
 DEFAULT_P6_TABLE_MAP = jdbc_mod.DEFAULT_P6_TABLE_MAP
 sanitize_value = jdbc_mod.sanitize_value
 resolve_table_owner = jdbc_mod.resolve_table_owner
+serialize_and_upload = jdbc_mod.serialize_and_upload
 
 
 @pytest.mark.unit
@@ -72,3 +73,68 @@ class TestJDBCExtractor:
         owner = resolve_table_owner(mock_cursor, "PROJECT", "ELEMENTL_PMDB_SBOX_PXRPTUSER")
         assert owner == "ELEMENTL_PMDB_SBOX_PXRPTUSER"
         mock_cursor.execute.assert_called_once()
+
+    def test_serialize_and_upload_formats(self):
+        mock_bucket = MagicMock()
+        mock_blob = MagicMock()
+        mock_bucket.blob.return_value = mock_blob
+
+        sample_rows = [
+            {"project_id": 1, "proj_name": "Apollo", "active": True},
+            {"project_id": 2, "proj_name": "Artemis", "active": False},
+        ]
+        all_cols = ["project_id", "proj_name", "active"]
+
+        # 1. Parquet
+        path, byte_count = serialize_and_upload(
+            bucket=mock_bucket,
+            gcs_slug="projects",
+            today_str="2026-09-22",
+            batch_id="batch123",
+            enriched_rows=sample_rows,
+            all_cols=all_cols,
+            dest_format="parquet",
+        )
+        assert path.endswith(".parquet")
+        assert byte_count > 0
+        assert mock_blob.upload_from_string.call_args[1]["content_type"] == "application/octet-stream"
+
+        # 2. CSV
+        path, byte_count = serialize_and_upload(
+            bucket=mock_bucket,
+            gcs_slug="projects",
+            today_str="2026-09-22",
+            batch_id="batch123",
+            enriched_rows=sample_rows,
+            all_cols=all_cols,
+            dest_format="csv",
+        )
+        assert path.endswith(".csv")
+        assert byte_count > 0
+        assert mock_blob.upload_from_string.call_args[1]["content_type"] == "text/csv"
+
+        # 3. JSON
+        path, byte_count = serialize_and_upload(
+            bucket=mock_bucket,
+            gcs_slug="projects",
+            today_str="2026-09-22",
+            batch_id="batch123",
+            enriched_rows=sample_rows,
+            all_cols=all_cols,
+            dest_format="json",
+        )
+        assert path.endswith(".json")
+        assert byte_count > 0
+        assert mock_blob.upload_from_string.call_args[1]["content_type"] == "application/x-ndjson"
+
+        # 4. SAME_AS_ORIGIN should raise ValueError for JDBC P6
+        with pytest.raises(ValueError, match="only allowed for Atlas"):
+            serialize_and_upload(
+                bucket=mock_bucket,
+                gcs_slug="projects",
+                today_str="2026-09-22",
+                batch_id="batch123",
+                enriched_rows=sample_rows,
+                all_cols=all_cols,
+                dest_format="SAME_AS_ORIGIN",
+            )

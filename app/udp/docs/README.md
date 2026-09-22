@@ -142,7 +142,7 @@ The DAG creation layer is orchestrated by [`app/udp/composer/dags/udp_dag_factor
    * When `udp_dag_factory.py` is parsed, it invokes `discover_all_configs()`.
 
 2. **Dual-Path Configuration Discovery**:
-   * **Path 1 (Primary - GCS Cloud Bucket)**: Scans `gs://<GCS_CONFIG_BUCKET>/sources/` (e.g. `gs://bkt-pid-nse-stg-core-apps-k8ti-udp-configs/sources/`). It downloads and parses all `.yaml` files.
+   * **Path 1 (Primary - GCS Cloud Bucket)**: Scans `gs://<GCS_CONFIG_BUCKET>/sources/` (e.g. `gs://bkt-elementl-509009-udp-configs/sources/`). It downloads and parses all `.yaml` files.
    * **Path 2 (Fallback - Local Filesystem)**: Scans local directories (`app/udp/configs/sources/` or `/home/airflow/gcs/dags/configs/sources/`).
    * Deduplication ensures each `task_id` is loaded only once per scheduler evaluation.
 
@@ -159,7 +159,7 @@ The DAG creation layer is orchestrated by [`app/udp/composer/dags/udp_dag_factor
   To add a new table pipeline to the platform, **no code needs to be written or deployed, and Airflow does not need to be restarted**.
   An engineer or automated script simply saves a new YAML file into the GCS bucket:
   ```bash
-  gcloud storage cp new_table.yaml gs://bkt-pid-nse-stg-core-apps-k8ti-udp-configs/sources/netsuite/
+  gcloud storage cp new_table.yaml gs://bkt-elementl-509009-udp-configs/sources/netsuite/
   ```
   Within 30–60 seconds, the Airflow scheduler reads the new file from GCS, constructs the DAG, and renders it in the Composer UI ready for scheduling.
 * **Updating Pipelines**:
@@ -282,7 +282,7 @@ $$	ext{gs://}\mathbf{\{raw\_landing\_bucket\}}	ext{/}\mathbf{\{source\_system\}}
 
 | Segment | Example | Purpose & Origin |
 | :--- | :--- | :--- |
-| **`{raw_landing_bucket}`** | `bkt-pid-nse-stg-core-apps-k8ti-udp-bronze-raw` | GCS Bucket resolved dynamically from `environments/*.json` (`raw_landing_bucket`) or `RAW_BUCKET_NAME`. Decoupled from table YAMLs for multi-environment portability. |
+| **`{raw_landing_bucket}`** | `bkt-elementl-509009-udp-bronze-raw` | GCS Bucket resolved dynamically from `environments/*.json` (`raw_landing_bucket`) or `RAW_BUCKET_NAME`. Decoupled from table YAMLs for multi-environment portability. |
 | **`{source_system}`** | `netsuite`, `p6`, `atlas` | `source_system` key in YAML. Establishes top-level boundary between disparate source technologies. |
 | **`raw`** | `raw` | Identifies the raw Bronze landing zone within the Medallion architecture. |
 | **`{target_table}`** | `netsuite_classification` | `target_table` key in YAML. Isolates records into individual table prefixes. |
@@ -338,7 +338,7 @@ Early prototypes explored HTTP Cloud Functions, but enterprise production worklo
 
 | Service Directory | Container Image | Target Source Platform | Extraction Protocol |
 | :--- | :--- | :--- | :--- |
-| `suiteql-ingestion/` | `udp-ingestion-jobs/suiteql-ingestion` | NetSuite ERP | SuiteQL REST API via OAuth 2.0 M2M JWT |
+| `suiteQL-ingestion/` | `udp-ingestion-jobs/suiteQL-ingestion` | NetSuite ERP | SuiteQL REST API via OAuth 2.0 M2M JWT |
 | `jdbc-ingestion/` | `udp-ingestion-jobs/jdbc-ingestion` | Oracle Primavera P6 EPPM | Oracle JDBC / `python-oracledb` over TCPS 2484 |
 | `arcgis-ingestion/` | `udp-ingestion-jobs/arcgis-ingestion` | Elementl Atlas (ArcGIS) | ESRI Feature Service REST API (GeoJSON) |
 | `bulk-ingestion/` | `udp-ingestion-jobs/bulk-ingestion` | Elementl Atlas (Bulk Spatial) | HTTP Bulk Downloader & In-Memory ZIP Unpacker |
@@ -368,7 +368,7 @@ Airflow GCSToBigQueryOperator
 ## 6. Centralized `common/` Core Library
 
 ### Why This Folder Exists
-In early iterations, each Cloud Run job (`suiteql-ingestion`, `jdbc-ingestion`, `arcgis-ingestion`, `bulk-ingestion`) duplicated utility code in its own `common/` subfolder. This violated DRY principles and created code drift risk.
+In early iterations, each Cloud Run job (`suiteQL-ingestion`, `jdbc-ingestion`, `arcgis-ingestion`, `bulk-ingestion`) duplicated utility code in its own `common/` subfolder. This violated DRY principles and created code drift risk.
 
 All shared logic has been **consolidated into a single source of truth**:
 [`app/udp/cloud-run-jobs/common/`](file:///usr/local/google/home/anikethd/elementl/ELEMENTL/elementl-data-ingestion-fw/app/udp/cloud-run-jobs/common/)
@@ -398,14 +398,14 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copy dependencies and install
-COPY suiteql-ingestion/requirements.txt requirements.txt
+COPY suiteQL-ingestion/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy centralized common core
 COPY common/ common/
 
 # Copy job-specific implementation
-COPY suiteql-ingestion/main.py main.py
+COPY suiteQL-ingestion/main.py main.py
 
 ENTRYPOINT ["python3", "main.py"]
 ```
@@ -418,9 +418,9 @@ steps:
     args:
       - 'build'
       - '-f'
-      - 'suiteql-ingestion/Dockerfile'
+      - 'suiteQL-ingestion/Dockerfile'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteql-ingestion:${SHORT_SHA}'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/udp-ingestion-jobs/suiteQL-ingestion:${SHORT_SHA}'
       - '.'
 ```
 
@@ -450,7 +450,7 @@ To prevent performance degradation and comply with client licensing constraints,
    ```
 2. **Job Configuration Level (`common/job_config.py` & `common/base_extractor.py`)**:
    The runtime configuration enforces `max_records <= 10` for NetSuite tasks, defaulting to 10 if an override attempts to request more.
-3. **Job Extractor Query Rewriter Level (`suiteql-ingestion/main.py`)**:
+3. **Job Extractor Query Rewriter Level (`suiteQL-ingestion/main.py`)**:
    The query rewriter automatically detects and injects `ROWNUM <= 10`:
    ```python
    def _apply_row_limit(query: str, max_records: int) -> str:
@@ -660,8 +660,8 @@ python3 app/udp/utilities/test_udp_end_to_end.py
 ### Deploying Cloud Run Services
 
 ```bash
-# Build and deploy a Cloud Run Job (e.g. suiteql-ingestion)
-gcloud builds submit   --config=app/udp/cloud-run-jobs/suiteql-ingestion/cloud_build.yaml   app/udp/cloud-run-jobs
+# Build and deploy a Cloud Run Job (e.g. suiteQL-ingestion)
+gcloud builds submit   --config=app/udp/cloud-run-jobs/suiteQL-ingestion/cloud_build.yaml   app/udp/cloud-run-jobs
 ```
 
 ### Onboarding a New Source Table (Step-by-Step)

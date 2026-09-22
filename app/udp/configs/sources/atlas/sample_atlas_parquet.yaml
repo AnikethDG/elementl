@@ -1,0 +1,72 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+template: ingestion_task_metadata
+version: '1.0'
+task_id: sample_atlas_parquet
+display_name: "Sample Atlas Parquet Ingestion"
+description: "Sample configuration demonstrating Parquet landing format for Atlas tabular/spatial extraction."
+domain: "geospatial"
+metadata_status: Active
+
+source:
+  type: atlas
+  category: tabular_api
+  format: tabular_jsonl
+  load_type: full_refresh
+  watermark_column: null
+  connection:
+    endpoint_url: "https://api.census.gov/data/2020/dec/pl"
+    layer_id: null
+    auth_type: none
+    query_params:
+      get: "NAME,P1_001N"
+      for: "state:*"
+    timeout_seconds: 180
+    max_retries: 5
+
+engine:
+  type: cloud_run_job
+  job_name: bulk-ingestion
+  timeout_seconds: 3600
+
+destination:
+  format: PARQUET
+  schema_strategy: static
+  domain_tags:
+    - "S1-01"
+    - "population"
+  unpack_archive: false
+  gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
+  gcs_prefix: "atlas/raw/sample_atlas_parquet/dt={{ ds }}/"
+  bq_project: "elementl-509009"
+  bq_dataset: "ds_bronze_atlas"
+  bq_table: "sample_atlas_parquet"
+  write_disposition: WRITE_TRUNCATE
+  partition_field: ingestion_date
+
+orchestration:
+  dag_id: dag_udp_sample_atlas_parquet
+  schedule: "@daily"
+  start_date: "2024-01-01 00:00:00"
+  catchup: false
+  retries: 1
+  retry_delay_minutes: 5
+  dataform:
+    enabled: true
+    target_dataset: "ds_silver"
+    target_table: "stg_sample_atlas_parquet"
+    included_tags:
+      - atlas
+      - sample_atlas_parquet

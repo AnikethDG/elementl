@@ -1,475 +1,159 @@
-# Cloud Run Monorepo Template (`terraform-app-infra-template`)
+# Elementl Unified Data Platform (UDP) — Application & Infrastructure Repository
 
-A production-ready Google Cloud Run monorepo template combining Infrastructure-as-Code (Terraform) and microservices (`apps/`) with independent CI/CD pipelines via Google Cloud Build.
+This repository implements the **Elementl Phase 2 Unified Data Platform (UDP)** on Google Cloud (`pid-nse-stg-core-apps-k8ti`), providing metadata-driven data ingestion and orchestration across **Oracle Primavera P6 (`ELEMENTL_PMDB_SBOX_PXRPTUSER`, 15 tables)**, **Oracle NetSuite (`SuiteQL`, 11 tables)**, and **Atlas (`ArcGIS` & `Bulk`, 4 GIS/tabular layers)** into a BigQuery Medallion Architecture (`Bronze -> Silver -> Gold`) orchestrated by **Cloud Composer 3**, **Cloud Run v2 Jobs**, and **Dataform**.
+
+All files in this repository adhere to the Google Cloud Professional Services (PSO) code delivery guidelines (`go/pso-code-guidance`).
 
 ---
 
-## 1. Architecture Overview
+## High-Level Repository Layout
+
+The repository is organized strictly into two domain layers:
 
 ```text
-+---------------------------------------------------------------------------------------------------+
-|                                          GIT MONOREPO                                             |
-|                                                                                                   |
-|   +---------------------------------------+       +-------------------------------------------+   |
-|   |                infra/                 |       |             apps/service-api/             |   |
-|   |  - Terraform configs (main.tf, etc.)  |       |  - Application code (main.py, etc.)       |   |
-|   |  - Pipeline (cloudbuild.yaml)         |       |  - Pipeline (cloudbuild.yaml)             |   |
-|   +---------------------------------------+       +-------------------------------------------+   |
-+-----------------------|---------------------------------------------------|-----------------------+
-                        | (Push: infra/**)                                  | (Push: apps/service-api/**)
-                        v                                                   v
-+---------------------------------------------------------------------------------------------------+
-|                                CLOUD BUILD TRIGGERS (PATH FILTERS)                                |
-|                                                                                                   |
-|   +---------------------------------------+       +-------------------------------------------+   |
-|   |         Trigger: deploy-infra         |       |      Trigger: deploy-service-api          |   |
-|   |       includedFiles: ["infra/**"]     |       |   includedFiles: ["apps/service-api/**"]  |   |
-|   +---------------------------------------+       +-------------------------------------------+   |
-+-----------------------|---------------------------------------------------|-----------------------+
-                        |                                                   |
-      [terraform apply] |                                                   | [docker build & push]
-                        |                                                   v
-                        |                                   +-------------------------------+
-                        |                                   |       ARTIFACT REGISTRY       |
-                        |                                   |  (Docker Container Images)    |
-                        |                                   +---------------+---------------+
-                        |                                                   |
-                        |                                                   | [gcloud run deploy]
-                        |                                                   | (image: service-api:$COMMIT_SHA)
-                        v                                                   v
-+---------------------------------------------------------------------------------------------------+
-|                                      GOOGLE CLOUD PLATFORM                                        |
-|                                                                                                   |
-|   +---------------------------------------+       +-------------------------------------------+   |
-|   |        Core / Shared Resources        |       |            Cloud Run Service              |   |
-|   |                                       |       |             (service-api)                 |   |
-|   |  - Artifact Registry repo             |       |                                           |   |
-|   |  - Runtime Service Account (least-priv|       |  - Initial shell created by Terraform     |   |
-|   |  - Cloud Run service shell            |------>|  - Revisions deployed by Cloud Build      |   |
-|   |                                       |       |  - lifecycle { ignore_changes = [image] } |   |
-|   +---------------------------------------+       +-------------------------------------------+   |
-+---------------------------------------------------------------------------------------------------+
+.
+├── README.md                  # Complete repository guide & file-by-file reference
+├── .gitignore                 # Git ignore rules for Python, Terraform, and local env files
+├── requirements.txt           # Root Python dependencies for local testing & CLI utilities
+├── app/
+│   ├── udp/                   # Unified Data Platform Application Layer (Cloud Run Jobs, Composer DAGs, YAML Configs, Schemas, Docs, Tests)
+│   └── infra/                 # UDP Terraform Infrastructure Definitions (mirrored with infra/udp/)
+└── infra/
+    ├── *.tf / cloudbuild.yaml # Root GCP project Terraform foundation & Cloud Build CI/CD pipeline
+    └── udp/                   # UDP Terraform Infrastructure Definitions (BigQuery, GCS, Cloud Run Jobs, Secrets, Composer, Dataform)
 ```
 
 ---
 
-## 2. Directory Layout
+## Purpose of Every Folder and File
 
-```
-terraform-app-infra-template/
-├── .gitignore
-├── README.md
-├── infra/                                # Infrastructure as Code (Terraform)
-│   ├── backend.tf                        # GCS remote state backend configuration
-│   ├── main.tf                           # Core infra, Artifact Registry, Service Accounts, Cloud Run shell
-│   ├── variables.tf                      # Parameterized variables (including environment)
-│   ├── outputs.tf                        # Exposed outputs (URLs, IDs, SAs)
-│   ├── versions.tf                       # Terraform & Google provider constraints
-│   ├── terraform.tfvars.example          # Sample configuration variables
-│   ├── environments/                     # Environment-specific variable files
-│   │   ├── dev.tfvars                    # Dev environment variables
-│   │   ├── staging.tfvars                # Staging environment variables
-│   │   └── prod.tfvars                   # Production environment variables
-│   └── cloudbuild.yaml                   # CI/CD pipeline to test & apply Terraform
-└── apps/                                 # Microservices directory
-    ├── README.md                         # Guide for managing and adding services
-    └── service-api/                      # Sample microservice (FastAPI / Python)
-        ├── main.py                       # App entrypoint (health checks, security headers)
-        ├── requirements.txt              # App dependencies
-        ├── test_main.py                  # Unit tests
-        ├── Dockerfile                    # Multi-stage/lean non-root container
-        ├── .dockerignore                 # Docker build exclusions
-        └── cloudbuild.yaml               # Dedicated CI/CD pipeline for service-api
-```
+### 1. Root Files
+
+| Path | Purpose |
+| :--- | :--- |
+| `README.md` | Master architectural overview and file-by-file directory reference for the entire repository. |
+| `.gitignore` | Excludes Python bytecode (`__pycache__/`, `*.pyc`), virtual environments (`.venv/`), Terraform working caches (`.terraform/`, `*.tfstate`), and local secret files (`.env*`). |
+| `requirements.txt` | Root Python dependencies for running unit/integration tests (`pytest`), Airflow DAG parsing (`apache-airflow`), and Cloud Run extraction clients (`oracledb`, `PyJWT`, `cryptography`, `requests`, `google-cloud-bigquery`, `google-cloud-storage`, `google-cloud-secret-manager`, `pyarrow`, `pyyaml`). |
 
 ---
 
-## 3. Key Concepts & Patterns
+### 2. Application Layer (`app/udp/`)
 
-### A. The Deployment Handoff Pattern (Crucial)
+Contains the complete Unified Data Platform application codebase, including the 4 containerized Cloud Run Jobs, the dynamic Cloud Composer 3 DAG factory, the 30 declarative source YAML configurations, BigQuery JSON schemas, architecture documentation, and unit/integration test suites.
 
-When combining Terraform and Cloud Run, you face the **"State Conflict"** problem:
-1. Terraform creates the Cloud Run service and stores the initial image tag (e.g., `us-docker.pkg.dev/cloudrun/container/hello`) in `terraform.tfstate`.
-2. When a developer pushes app code, Cloud Build builds a new image tag (`service-api:$COMMIT_SHA`) and deploys a new Cloud Run revision.
-3. If Terraform does not account for this, the next `terraform apply` will detect drift and **revert Cloud Run back to the initial placeholder image**.
+#### 2.1 Environment Configurations (`app/udp/environments/`)
 
-#### The Solution: `lifecycle { ignore_changes = [...] }`
-In `infra/main.tf`, Terraform provisions the Cloud Run service shell and delegates ongoing image and revision management to Cloud Build:
+| Path | Purpose |
+| :--- | :--- |
+| `app/udp/README.md` | Quick-start guide for the `app/udp/` application module, test suites, and runtime commands. |
+| `app/udp/environments/dev.json` | Runtime environment configuration for Development (`pid-nse-dev-core-apps-dz09`). |
+| `app/udp/environments/staging.json` | Runtime environment configuration for Staging/QA (`pid-nse-stg-core-apps-k8ti`), defining `bkt-pid-nse-stg-core-apps-k8ti-udp-landing-staging`, `ds_bronze_*`, `ds_silver_*`, `ds_gold`, `ds_operations`, and partitioned service accounts. |
+| `app/udp/environments/production.json` | Runtime environment configuration for Production (`pid-nse-prd-core-apps-6aw8`). |
 
-```hcl
-resource "google_cloud_run_v2_service" "services" {
-  # ... configuration ...
+#### 2.2 Containerized Extraction Workers (`app/udp/cloud-run-jobs/`)
 
-  lifecycle {
-    # CRITICAL: Prevents Terraform from overriding subsequent Cloud Build deployments
-    ignore_changes = [
-      template[0].containers[0].image,
-      template[0].revision,
-      client,
-      client_version
-    ]
-  }
-}
-```
+External source extraction is isolated from Airflow into 4 dedicated Cloud Run v2 Jobs running inside Shared VPC subnet `sub-ns-stg-usc1` (egressing via Cloud NAT static IP `136.115.148.145`).
 
-### B. CI/CD Trigger Strategy (Trigger Path Filters)
+| Path | Purpose |
+| :--- | :--- |
+| `app/udp/cloud-run-jobs/cloudbuild.yaml` | Multi-stage Cloud Build configuration that builds and pushes all 4 Cloud Run Job container images (`jdbc-ingestion`, `suiteql-ingestion`, `arcgis-ingestion`, `bulk-ingestion`) to Artifact Registry. |
+| **`app/udp/cloud-run-jobs/common/`** | **Shared Python extraction framework used across all 4 Cloud Run Jobs:** |
+| `app/udp/cloud-run-jobs/common/README.md` | Developer documentation for the shared extraction base classes and audit telemetry. |
+| `app/udp/cloud-run-jobs/common/__init__.py` | Package initializer exporting `BaseExtractor`, `JobConfig`, and `JobRunner`. |
+| `app/udp/cloud-run-jobs/common/base_extractor.py` | Abstract `BaseExtractor` implementing dual Bronze persistence (raw JSONL/Parquet writes to GCS `bkt-*-udp-landing-staging` + native BigQuery loads into `ds_bronze_*`), high-watermark state lookup, and run-level audit logging into `ds_operations.audit_ingestion_runs`. |
+| `app/udp/cloud-run-jobs/common/job_config.py` | `JobConfig` parser that loads entity YAML configurations, environment JSONs, CLI arguments (`--source-system`, `--entity-name`), and GCP Secret Manager payloads. |
+| `app/udp/cloud-run-jobs/common/job_runner.py` | `JobRunner` execution harness providing structured JSON logging, retry handling, execution timing, and non-zero failure exit codes for Airflow task monitoring. |
+| **`app/udp/cloud-run-jobs/jdbc-ingestion/`** | **Oracle Primavera P6 (`ELEMENTL_PMDB_SBOX_PXRPTUSER`) Extraction Worker (`crj-*-jdbc-ingestion`):** |
+| `app/udp/cloud-run-jobs/jdbc-ingestion/main.py` | Connects to AWS RDS Oracle 19c (`db-ora-prd-01.ctk6fk2blyyo.us-gov-west-1.rds.amazonaws.com:2484/orcl`) over TCPS (TLS 1.2) using `oracledb` thin mode and Secret Manager (`secret-p6-db-config`, `secret-p6-db-ca-bundle`), extracting the 15 in-scope P6 tables from `ELEMENTL_PMDB_SBOX_PXRPTUSER` into GCS and BigQuery `ds_bronze_p6`. |
+| `app/udp/cloud-run-jobs/jdbc-ingestion/Dockerfile` | Container image definition for the P6 `jdbc-ingestion` worker. |
+| `app/udp/cloud-run-jobs/jdbc-ingestion/cloud_build.yaml` | Standalone Cloud Build specification for `jdbc-ingestion`. |
+| `app/udp/cloud-run-jobs/jdbc-ingestion/requirements.txt` | Python dependencies (`oracledb`, `google-cloud-bigquery`, `google-cloud-storage`, `google-cloud-secret-manager`, `pyarrow`). |
+| **`app/udp/cloud-run-jobs/suiteQL-ingestion/`** | **Oracle NetSuite (`SuiteQL`) Extraction Worker (`crj-*-suiteql-ingestion`):** |
+| `app/udp/cloud-run-jobs/suiteQL-ingestion/main.py` | Authenticates with Oracle NetSuite REST Web Services using OAuth 2.0 Client Credentials M2M JWT (`PS256`/`RS256` signed with the private key from the 5 NetSuite secrets in Secret Manager), executes paginated SuiteQL queries (`POST /services/rest/query/v1/suiteql`) for the 11 in-scope NetSuite tables, and lands data into GCS and BigQuery `ds_bronze_netsuite`. |
+| `app/udp/cloud-run-jobs/suiteQL-ingestion/Dockerfile` | Container image definition for the NetSuite `suiteQL-ingestion` worker. |
+| `app/udp/cloud-run-jobs/suiteQL-ingestion/cloud_build.yaml` | Standalone Cloud Build specification for `suiteQL-ingestion`. |
+| `app/udp/cloud-run-jobs/suiteQL-ingestion/requirements.txt` | Python dependencies (`PyJWT`, `cryptography`, `requests`, `google-cloud-bigquery`, `google-cloud-storage`, `google-cloud-secret-manager`). |
+| **`app/udp/cloud-run-jobs/arcgis-ingestion/`** | **Atlas GIS (`ArcGIS REST`) Extraction Worker (`crj-*-arcgis-ingestion`):** |
+| `app/udp/cloud-run-jobs/arcgis-ingestion/main.py` | Extracts spatial vector layers (`S1-02` Urban Areas, `S1-06` Quaternary Faults) from ArcGIS FeatureServer/MapServer endpoints into GCS and BigQuery `ds_bronze_atlas`. |
+| `app/udp/cloud-run-jobs/arcgis-ingestion/clients/__init__.py` | ArcGIS client subpackage initializer. |
+| `app/udp/cloud-run-jobs/arcgis-ingestion/clients/arcgis_client.py` | Paginated ArcGIS REST client supporting `resultOffset`/`resultRecordCount`, geometry serialization (WKT/GeoJSON), and spatial reference (`EPSG:4326`) standardization. |
+| `app/udp/cloud-run-jobs/arcgis-ingestion/clients/auth.py` | Authentication handler for token-protected ArcGIS endpoints. |
+| `app/udp/cloud-run-jobs/arcgis-ingestion/Dockerfile` | Container image definition for the `arcgis-ingestion` worker. |
+| `app/udp/cloud-run-jobs/arcgis-ingestion/cloud_build.yaml` | Standalone Cloud Build specification for `arcgis-ingestion`. |
+| `app/udp/cloud-run-jobs/arcgis-ingestion/requirements.txt` | Python dependencies for GIS/ArcGIS extraction. |
+| **`app/udp/cloud-run-jobs/bulk-ingestion/`** | **Atlas Bulk / Archive (`CSV/ZIP/Shapefile`) Extraction Worker (`crj-*-bulk-ingestion`):** |
+| `app/udp/cloud-run-jobs/bulk-ingestion/main.py` | Downloads bulk tabular and shapefile/ZIP archives (`S1-01` Population Density, `S2-20` Cooling Water Supply), unpacks archive contents into GCS `bkt-*-udp-landing-staging`, and loads Bronze envelope tables into BigQuery `ds_bronze_atlas`. |
+| `app/udp/cloud-run-jobs/bulk-ingestion/clients/__init__.py` | Bulk client subpackage initializer. |
+| `app/udp/cloud-run-jobs/bulk-ingestion/clients/auth.py` | HTTP session and header authentication handler for bulk data feeds. |
+| `app/udp/cloud-run-jobs/bulk-ingestion/Dockerfile` | Container image definition for the `bulk-ingestion` worker. |
+| `app/udp/cloud-run-jobs/bulk-ingestion/cloud_build.yaml` | Standalone Cloud Build specification for `bulk-ingestion`. |
+| `app/udp/cloud-run-jobs/bulk-ingestion/requirements.txt` | Python dependencies for bulk HTTP and archive extraction. |
 
-To ensure fast builds and prevent unnecessary deployments in a monorepo, Cloud Build Triggers use the `includedFiles` filter:
+#### 2.3 Cloud Composer 3 Orchestration (`app/udp/composer/dags/`)
 
-| Trigger Name | Event | Included Files Filter | Configuration File | Target Env | Approval Required |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `deploy-infra-dev` | Push to `^main$` | `infra/**` | `infra/cloudbuild.yaml` | `dev` | No |
-| `deploy-service-api-dev` | Push to `^main$` | `apps/service-api/**` | `apps/service-api/cloudbuild.yaml` | `dev` | No |
-| `deploy-service-api-staging` | Push tag `^v.*` | N/A (Tag push) | `apps/service-api/cloudbuild.yaml` | `staging` | No |
-| `deploy-service-api-prod` | Push tag `^v.*` | N/A (Tag push) | `apps/service-api/cloudbuild.yaml` | `prod` | **Yes (Manual)** |
+| Path | Purpose |
+| :--- | :--- |
+| `app/udp/composer/dags/udp_dag_factory.py` | Dynamic Airflow DAG Factory that scans `app/udp/configs/sources/**/*.yaml` at parse time and constructs a standardized 2-TaskGroup DAG per entity: **TaskGroup 1 (`ingestion_group`)** triggers the corresponding Cloud Run Job (`CloudRunExecuteJobOperator`) and lands GCS/BigQuery Bronze (`ds_bronze_*`); **TaskGroup 2 (`dataform_transformation_group`)** compiles and executes the Dataform Silver SQLX model (`ds_silver_*`) and assertions (`ds_dataform_assertions`). |
+| `app/udp/composer/dags/samples/dag_udp_p6_project.py` | Sample reference DAG demonstrating end-to-end orchestration for Oracle Primavera P6 `PROJECT` (`ELEMENTL_PMDB_SBOX_PXRPTUSER.PROJECT` -> `ds_bronze_p6.project` -> `ds_silver_p6.stg_p6_project`). |
+| `app/udp/composer/dags/samples/dag_udp_netsuite_department.py` | Sample reference DAG demonstrating end-to-end orchestration for Oracle NetSuite `department` (`ds_bronze_netsuite.department` -> `ds_silver_netsuite.stg_netsuite_department`). |
+| `app/udp/composer/dags/samples/dag_udp_atlas_s1_02_urban_areas.py` | Sample reference DAG demonstrating end-to-end orchestration for Atlas `S1-02` Urban Areas (`ds_bronze_atlas.s1_02_urban_areas` -> `ds_silver_atlas.stg_atlas_s1_02_urban_areas`). |
+| `app/udp/composer/dags/samples/dag_udp_sample_atlas_same_as_origin.py` | Sample reference DAG demonstrating zero-conversion passthrough (`same_as_origin`) ingestion and landing for Atlas datasets. |
 
-- **Blast Radius Reduction**: Changes in `service-api` do not trigger Terraform or other services.
-- **Fast Execution**: Only modified components are built and tested.
-- **Scoping via `dir:`**: Each step in Cloud Build uses `dir: 'apps/<service>'` or `dir: 'infra'` to execute within its respective directory context.
+#### 2.4 Declarative Source YAMLs & Schemas (`app/udp/configs/`)
 
-### C. Branching & Promotion Strategy: Deep Dive
+| Path | Purpose |
+| :--- | :--- |
+| `app/udp/configs/sources/_template_source_reference.yaml` | Annotated onboarding blueprint showing all supported YAML keys for adding a new table in <5 minutes without modifying Python code. |
+| `app/udp/configs/sources/p6/*.yaml` (17 files) | Declarative source definitions for the 15 in-scope Oracle Primavera P6 tables in `ELEMENTL_PMDB_SBOX_PXRPTUSER` (`p6_project.yaml`, `p6_wbs.yaml`, `p6_wbscategory.yaml`, `p6_activity.yaml`, `p6_udfvalue.yaml`, `p6_udftype.yaml`, `p6_wbsspread.yaml`, `p6_activityspread.yaml`, `p6_epsspread.yaml`, `p6_resourceassignmentspread.yaml`, `p6_projectspread.yaml`, `p6_refrdelete.yaml`, `p6_activitycode.yaml`, `p6_activitycodetype.yaml`, `p6_activitycodeassignment.yaml`) plus 2 format validation samples (`sample_p6_csv.yaml`, `sample_p6_json.yaml`). |
+| `app/udp/configs/sources/netsuite/*.yaml` (13 files) | Declarative SuiteQL source definitions for the 11 in-scope Oracle NetSuite tables (`netsuite_account.yaml`, `netsuite_budgets.yaml`, `netsuite_classification.yaml`, `netsuite_customer.yaml`, `netsuite_department.yaml`, `netsuite_entity.yaml`, `netsuite_location.yaml`, `netsuite_subsidiary.yaml`, `netsuite_transaction.yaml`, `netsuite_transactionline.yaml`, `netsuite_vendor.yaml`) plus 2 format validation samples (`sample_netsuite_csv.yaml`, `sample_netsuite_json.yaml`). |
+| `app/udp/configs/sources/atlas/*.yaml` (7 files) | Declarative source definitions for the 4 in-scope Atlas layers (`atlas_s1_01_population_density.yaml`, `atlas_s1_02_urban_areas.yaml`, `atlas_s1_06_quaternary_faults.yaml`, `atlas_s2_20_cooling_water_supply.yaml`) plus 3 format validation samples (`sample_atlas_csv.yaml`, `sample_atlas_parquet.yaml`, `sample_atlas_same_as_origin.yaml`). |
+| `app/udp/configs/schema/p6/*.json` (15 files) | BigQuery Bronze JSON column schemas (`p6_*_schema.json`) corresponding to the 15 P6 `ELEMENTL_PMDB_SBOX_PXRPTUSER` tables. |
+| `app/udp/configs/schema/netsuite/*.json` (11 files) | BigQuery Bronze JSON column schemas (`netsuite_*_schema.json`) corresponding to the 11 NetSuite SuiteQL tables. |
 
-A robust branching and deployment strategy balances **developer velocity**, **production stability**, and **security isolation**. Below is a detailed breakdown of the **Primary Trunk-Based Strategy** (recommended for startups and modern cloud-native teams) and the **Fallback Environment-Branching Model**.
+#### 2.5 Documentation, Tests, and CLI Utilities (`app/udp/docs/`, `app/udp/tests/`, `app/udp/utilities/`)
 
----
-
-#### 1. Primary Strategy: Trunk-Based Development (Recommended)
-
-In Trunk-Based Development, developers collaborate on a single main branch (`main`) with short-lived feature branches (`feat/*`, `fix/*`). Environments are decoupled from Git branches and instead map to **commits** and **Git Tags**.
-
-```text
-+---------------------------------------------------------------------------------------------------+
-|                         PRIMARY: TRUNK-BASED PROMOTION WORKFLOW                                   |
-|                                                                                                   |
-|   [feature/login] --------(PR to main)------> [main] -------(Git Tag: v1.0.0)-----> [PROMOTION]   |
-|         |                                        |                                        |       |
-|         v                                        v                                        v       |
-|   - Local dev / tests                      - Automated Deploy                       +-----------+ |
-|   - CI: pytest & tf plan                   - DEV GCP Project                        | Staging & | |
-|                                            - Smoke tests & QA                       | Prod Sync | |
-|                                                                                     +-----+-----+ |
-|                                                                                           |       |
-|                                              +--------------------------------------------+       |
-|                                              |                                                    |
-|                                              v                                                    v
-|                                   +---------------------+                      +----------------------+
-|                                   | Automated Deploy    |                      | Trigger for PROD     |
-|                                   | STAGING GCP Project |                      | (REQUIRES APPROVAL)  |
-|                                   +---------------------+                      +----------+-----------+
-|                                                                                           |
-|                                                                                           | (Manual Click)
-|                                                                                           v
-|                                                                                +----------------------+
-|                                                                                | Deploy to PRODUCTION |
-|                                                                                | PROD GCP Project     |
-|                                                                                +----------------------+
-+---------------------------------------------------------------------------------------------------+
-```
-
-##### Why This Works Best for Startups
-1. **Zero Branch Drift**: No divergent `develop` or `release` branches. What is tested on `main` is what goes to production.
-2. **Build Once, Promote Everywhere**:
-   - The container image is built and tagged once with the immutable `$COMMIT_SHA`.
-   - The **identical image binary** that ran in Dev is promoted to Staging and Prod—eliminating "works in staging, fails in prod" caused by container rebuilds.
-3. **3-Project Multi-Environment Isolation**:
-   - **Dev Project** (`p-...-dev`): Fast deploys, debug logging, minimal instance limits.
-   - **Staging Project** (`p-...-staging`): Production replica for QA and integration testing.
-   - **Prod Project** (`p-...-prod`): High availability, min instances = 1 (zero cold starts), strict IAM access.
-4. **Human-in-the-Loop Safety Gate**:
-   - Pushing tag `v1.0.0` immediately deploys to **Staging**.
-   - The same tag fires the **Production** trigger in Cloud Build, but pauses in `PENDING_APPROVAL` status until an authorized engineer clicks **Approve** in the GCP Console.
-
-##### Rollback Procedure in Trunk-Based Model
-- **Instant Cloud Run Traffic Rollback (Zero Downtime)**:
-  Cloud Run keeps previous revisions available. If a bug is detected in production, roll traffic back immediately via `gcloud`:
-  ```bash
-  gcloud run services update-traffic service-api \
-      --to-revisions=service-api-PREVIOUS-REVISION=100 \
-      --project=YOUR_PROD_PROJECT_ID \
-      --region=us-central1
-  ```
-- **Git Tag Rollback**:
-  Re-deploy any known healthy tag (e.g. `v0.9.8`) to redeploy the previous container image across environments.
+| Path | Purpose |
+| :--- | :--- |
+| `app/udp/docs/README.md` | Index of architecture, sequence diagrams, and testing documentation. |
+| `app/udp/docs/architecture_and_flows.md` & `.html` | Comprehensive UDP architecture specification covering Medallion storage (`ds_bronze_*`, `ds_silver_*`, `ds_gold`), network egress (`136.115.148.145`), and execution sequence flows. |
+| `app/udp/docs/unit_testing.md` | Guide for running hermetic unit tests with mock GCP/database clients. |
+| `app/udp/docs/integration_testing.md` | Guide for executing live GCP integration validation against BigQuery, GCS, Cloud Run Jobs, and Composer. |
+| `app/udp/docs/index.html`, `_reference_template.html`, `build_reference.py` | HTML documentation builder and interactive visual reference portal. |
+| `app/udp/docs/assets/` | Architecture diagrams (`01_medallion_architecture.png` through `09_schema_evolution_architecture.png`, SVG diagrams, and `mermaid.min.js`). |
+| `app/udp/tests/README.md`, `pytest.ini`, `conftest.py`, `findings.md` | Pytest configuration, shared test fixtures, and Composer v2/v3 validation report. |
+| `app/udp/tests/unit/test_*.py` (6 files) | Unit tests for `BaseExtractor`, `JobConfig`, `jdbc-ingestion`, `suiteQL-ingestion`, `bulk-ingestion`, and `udp_dag_factory.py`. |
+| `app/udp/tests/integration/test_*.py` (5 files) | Live GCP integration tests verifying BigQuery datasets (`ds_*`), GCS landing buckets, Cloud Run v2 Jobs, Composer DAGs, and operational audit logging. |
+| `app/udp/utilities/table_onboarding.py` | CLI generator that scaffolds a new source YAML and BigQuery schema JSON for rapid table onboarding. |
+| `app/udp/utilities/test_udp_end_to_end.py` | End-to-end validation script verifying extraction -> GCS staging -> BigQuery Bronze -> Dataform Silver. |
+| `app/udp/utilities/bootstrap_bq_tables.sh` | Idempotent `bq` CLI bootstrap script that creates and populates all 10 standardized `ds_*` BigQuery datasets and Bronze/Silver/Gold/Audit tables in `pid-nse-stg-core-apps-k8ti`. |
 
 ---
 
-#### 2. Fallback Strategy: Environment-Branching (`dev` -> `staging` -> `main`/`prod`)
+### 3. Terraform Infrastructure Layer (`infra/udp/`, `app/infra/`, and `infra/`)
 
-While Trunk-Based Development is recommended, some organizations prefer or require an **Environment-Branching Model** (GitOps-style branch segregation).
+Provisions all Google Cloud resources in the consolidated project (`pid-nse-stg-core-apps-k8ti`) with dataset-level and bucket-level compensating IAM controls. Note that `app/infra/` and `infra/udp/` contain the identical UDP Terraform module definitions for compatibility across both SSM and Customer GitHub CI/CD pipelines.
 
-```text
-+---------------------------------------------------------------------------------------------------+
-|                        FALLBACK: ENVIRONMENT-BRANCHING WORKFLOW                                   |
-|                                                                                                   |
-|   [feature/xyz] ---(PR)---> [dev branch] --------(PR)-------> [staging branch] --------(PR)----->|
-|                                  |                                  |                             |
-|                                  v                                  v                             |
-|                           [Deploy to DEV]                   [Deploy to STAGING]                   |
-|                           (Dev GCP Project)                 (Staging GCP Project)                 |
-|                                                                                                   |
-|   ---------------------------------------------------------------------------------------------   |
-|   ... Continued:                                                                                  |
-|   ----(PR)----> [main / prod branch]                                                              |
-|                        |                                                                          |
-|                        v                                                                          |
-|                 [Deploy to PROD]                                                                  |
-|                 (Prod GCP Project)                                                                |
-+---------------------------------------------------------------------------------------------------+
-```
+#### 3.1 UDP Terraform Definitions (`infra/udp/` and `app/infra/`)
 
-##### When to Use the Fallback Model
-- **Strict Compliance & Audit**: Regulated industries (FinTech, HealthTech) requiring audit logs of PR approvals specifically between environment branches.
-- **Branch-Level Access Restrictions**: When GitHub branch protection rules are used to restrict who can merge into `staging` or `main`.
+| Path | Purpose |
+| :--- | :--- |
+| `bigquery_datasets.tf` | Provisions the 10 standardized BigQuery datasets (`ds_bronze_p6`, `ds_bronze_netsuite`, `ds_bronze_atlas`, `ds_silver_p6`, `ds_silver_netsuite`, `ds_silver_atlas`, `ds_gold`, `ds_dataform_assertions`, `ds_operations`, `ds_atlas_analytics`) and enforces dataset-level IAM (`roles/bigquery.dataEditor` / `roles/bigquery.dataViewer` scoped per dataset to `gcp-sa-nsedusc1-data-ingest`, `gcp-sa-nsedusc1-data-transform`, and `gcp-sa-nsedusc1-composer`). |
+| `gcs_buckets.tf` | Provisions `bkt-${var.project_id}-udp-landing-staging` (with 90-day Archive object lifecycle) and `bkt-${var.project_id}-udp-dataflow-temp`, plus bucket-level `roles/storage.objectAdmin` / `roles/storage.objectViewer` bindings. |
+| `cloud_run_jobs.tf` | Provisions the 4 Cloud Run v2 Jobs (`crj-${var.project_id}-jdbc-ingestion`, `crj-${var.project_id}-suiteql-ingestion`, `crj-${var.project_id}-arcgis-ingestion`, `crj-${var.project_id}-bulk-ingestion`) attached to Shared VPC subnet `sub-ns-stg-usc1` (`PRIVATE_RANGES_ONLY`), and declares the 9 Secret Manager secrets (`secret-p6-db-config`, `secret-p6-db-ca-bundle`, `secret-p6-api-username`, `secret-p6-api-password`, `secret-netsuite-account-id`, `secret-netsuite-consumer-key`, `secret-netsuite-certificate-id`, `secret-netsuite-certificate-private-key`, `secret-netsuite-scope`) with `user_managed` replication in `us-central1`. |
+| `composer.tf` | Declaratively uploads and syncs `app/udp/composer/dags/`, `app/udp/configs/`, and `app/udp/environments/` into the Cloud Composer 3 DAGs GCS bucket (`google_storage_bucket_object` with MD5 hash tracking). |
+| `dataform.tf` | Provisions the GCP Dataform repository (`df-${var.project_id}-udp-transformations`) in `us-central1` and binds `gcp-sa-nsedusc1-data-transform` and the Dataform service agent to the Bronze, Silver, Gold, and Assertions datasets. |
+| `variables.tf` | Declares input variables (`project_id`, `region`, `environment`, `vpc_network`, `vpc_subnetwork`, `composer_dags_bucket`, and service account emails). |
+| `backend.tf` | Configures the remote GCS Terraform state backend (`gs://gcs-pid-nse-stg-core-apps-k8ti-tfstate`, prefix `terraform/udp/state`). |
+| `versions.tf` | Specifies Terraform (`>= 1.5`) and Google provider (`~> 5.0`) version constraints. |
+| `cloud_build.yaml` | Standalone Cloud Build Terraform validation and plan pipeline for `infra/udp/`. |
 
-##### Known Pitfalls & Trade-Offs of Environment-Branching
-- **Branch Drift**: If a critical hotfix is merged into `main`, it must be manually cherry-picked or back-merged into `staging` and `dev`. If missed, branches diverge quickly ("merge hell").
-- **Image Rebuild Risk**: If each branch triggers `docker build`, the container image in Production might contain different package versions or compiler artifacts than what was verified in Staging.
-- **Slower Velocity**: Every release requires opening, reviewing, and merging 3 separate Pull Requests.
+#### 3.2 Root Project Foundation (`infra/`)
 
-##### How to Adopt the Fallback Model in this Repo
-If you choose to switch to Environment-Branching:
-1. Create persistent branches: `dev`, `staging`, and `main` (or `prod`).
-2. Update Cloud Build Triggers:
-   - `deploy-service-api-dev`: Trigger on Push to branch `^dev$`.
-   - `deploy-service-api-staging`: Trigger on Push to branch `^staging$`.
-   - `deploy-service-api-prod`: Trigger on Push to branch `^main$` (or `^prod$`).
-3. Set `_TARGET_PROJECT_ID` and `_ENVIRONMENT` accordingly in each trigger.
-
----
-
-#### 3. Comparative Summary: Trunk-Based vs Environment-Branching
-
-| Dimension | Trunk-Based Development (Primary) | Environment-Branching (Fallback) |
-| :--- | :--- | :--- |
-| **Release Velocity** | **Very High**: Merge to `main` deploys to Dev; Git tag promotes. | **Moderate / Low**: Requires 3 sequential PRs per release. |
-| **Branch Maintenance** | **Minimal**: Only short-lived feature branches + `main`. | **High**: Long-lived `dev`, `staging`, and `main` branches. |
-| **Merge Conflicts** | **Rare**: Frequent small merges to trunk. | **Frequent**: Hotfixes & back-merges create conflict risk. |
-| **Container Immutability** | **Guaranteed**: Same `$COMMIT_SHA` promoted to all envs. | **Risk**: Typically rebuilds on each branch merge. |
-| **Production Gate** | Cloud Build **Approval Gate** triggered on Git tag. | GitHub PR merge approval into `main` branch. |
-| **Rollback Speed** | Instant Cloud Run traffic switch or tag redeploy. | Revert PR, merge, and wait for full pipeline. |
-| **Best For** | Startups, SaaS, high-growth engineering teams. | Regulated enterprise with strict compliance mandates. |
-
-
-
----
-
-## 4. Getting Started
-
-### Step 1: Prerequisites & IAM Setup
-
-Ensure you have the Google Cloud CLI (`gcloud`) installed and authenticated:
-
-```bash
-gcloud auth login
-gcloud auth application-default login
-gcloud config set project YOUR_PROJECT_ID
-```
-
-#### Cloud Build Service Account Permissions
-
-##### Option A: Using a Custom Service Account (e.g. `tf-deploy@...`) - Recommended
-When configuring a trigger with a user-specified custom service account, GCP requires:
-1. **`roles/logging.logWriter`** on the project (so Cloud Build can write build logs).
-2. **`roles/iam.serviceAccountUser`** granted to the Cloud Build Service Agent (`service-<PROJECT_NUMBER>@gcp-sa-cloudbuild.iam.gserviceaccount.com`) on the custom service account.
-3. Relevant deployment roles on the project (e.g., `roles/run.admin`, `roles/artifactregistry.writer`, `roles/iam.serviceAccountUser`, and for Terraform: resource management permissions).
-
-Run these commands to configure the custom service account:
-
-```bash
-PROJECT_ID="YOUR_PROJECT_ID"
-PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
-CUSTOM_SA="tf-deploy@${PROJECT_ID}.iam.gserviceaccount.com"
-CB_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-cloudbuild.iam.gserviceaccount.com"
-
-# 1. Project-level permissions for Cloud Build logging
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$CUSTOM_SA" \
-    --role="roles/logging.logWriter"
-
-# 2. Allow Cloud Build Service Agent to impersonate the custom service account
-gcloud iam service-accounts add-iam-policy-binding $CUSTOM_SA \
-    --member="serviceAccount:$CB_SERVICE_AGENT" \
-    --role="roles/iam.serviceAccountUser" \
-    --project=$PROJECT_ID
-
-# 3. Cloud Run & Artifact Registry deployment permissions
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$CUSTOM_SA" \
-    --role="roles/run.admin"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$CUSTOM_SA" \
-    --role="roles/iam.serviceAccountUser"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$CUSTOM_SA" \
-    --role="roles/artifactregistry.writer"
-```
-
-##### Option B: Using the Default Cloud Build Service Account
-If using the default Cloud Build Service Account (`<PROJECT_NUMBER>@cloudbuild.gserviceaccount.com`):
-
-```bash
-PROJECT_ID="YOUR_PROJECT_ID"
-PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
-CB_SA="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
-
-# Cloud Run Admin, Service Account User, and Artifact Registry Writer
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$CB_SA" \
-    --role="roles/run.admin"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$CB_SA" \
-    --role="roles/iam.serviceAccountUser"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$CB_SA" \
-    --role="roles/artifactregistry.writer"
-```
-
----
-
-### Step 2: Bootstrap Infrastructure with Terraform
-
-1. Navigate to the `infra/` directory:
-   ```bash
-   cd infra
-   ```
-
-2. Configure your remote backend in `infra/backend.tf`:
-   Ensure `bucket` matches your project's state bucket (created with project creation):
-   ```hcl
-   terraform {
-     backend "gcs" {
-       bucket = "gcs-pid-ns-cmn-app-tfstate-iv0b"
-       # Prefix is dynamically supplied per environment via -backend-config="prefix=..."
-     }
-   }
-   ```
-
-3. Create your `terraform.tfvars`:
-   ```bash
-   cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars with your GCP project_id and region
-   ```
-
-4. Initialize and apply Terraform:
-   ```bash
-   terraform init
-   terraform plan
-   terraform apply
-   ```
-
-This will create:
-- Google Cloud APIs enabled (`run.googleapis.com`, `artifactregistry.googleapis.com`, etc.)
-- Artifact Registry repository (`app-repo`)
-- Dedicated runtime service accounts (e.g., `sa-service-api`)
-- Initial Cloud Run service shell for `service-api`
-
----
-
-### Step 3: Configure Cloud Build Triggers
-
-Create Cloud Build triggers in the [Google Cloud Console](https://console.cloud.google.com/cloud-build/triggers) or using `gcloud`:
-
-#### 1. Infrastructure Triggers
-- **Dev (`deploy-infra-dev`)**:
-  - **Event**: Push to branch `^main$`
-  - **Included files filter**: `infra/**`
-  - **Configuration**: Cloud Build configuration file -> `infra/cloudbuild.yaml`
-  - **Substitutions**:
-    - `_ENVIRONMENT`: `dev`
-    - `_REGION`: `us-central1`
-
-#### 2. Application Triggers (Trunk-Based Promotion)
-- **Dev (`deploy-service-api-dev`)**:
-  - **Event**: Push to branch `^main$`
-  - **Included files filter**: `apps/service-api/**`
-  - **Configuration**: Cloud Build configuration file -> `apps/service-api/cloudbuild.yaml`
-  - **Substitutions**:
-    - `_ENVIRONMENT`: `dev`
-    - `_TARGET_PROJECT_ID`: `YOUR_DEV_PROJECT_ID` (e.g. `p-nsedusc1-core-app-fe-01-irzf`)
-    - `_SERVICE_NAME`: `service-api`
-    - `_REGION`: `us-central1`
-    - `_ARTIFACT_REPO`: `app-repo`
-
-- **Staging (`deploy-service-api-staging`)**:
-  - **Event**: Push new tag (Regex: `^v.*` or `^service-api-v.*`)
-  - **Configuration**: Cloud Build configuration file -> `apps/service-api/cloudbuild.yaml`
-  - **Substitutions**:
-    - `_ENVIRONMENT`: `staging`
-    - `_TARGET_PROJECT_ID`: `YOUR_STAGING_PROJECT_ID`
-    - `_SERVICE_NAME`: `service-api`
-    - `_REGION`: `us-central1`
-    - `_ARTIFACT_REPO`: `app-repo`
-
-- **Production (`deploy-service-api-prod` - Approval Required)**:
-  - **Event**: Push new tag (Regex: `^v.*` or `^service-api-v.*`)
-  - **Approval**: Enable **"Require approval before build executes"**
-  - **Configuration**: Cloud Build configuration file -> `apps/service-api/cloudbuild.yaml`
-  - **Substitutions**:
-    - `_ENVIRONMENT`: `prod`
-    - `_TARGET_PROJECT_ID`: `YOUR_PROD_PROJECT_ID`
-    - `_SERVICE_NAME`: `service-api`
-    - `_REGION`: `us-central1`
-    - `_ARTIFACT_REPO`: `app-repo`
-
----
-
-### Step 4: Deploying & Promoting Changes
-
-1. **Deploying to Dev**:
-   - Merge your feature branch PR into `main`.
-   - The `deploy-service-api-dev` trigger automatically runs tests, builds the container image with `$COMMIT_SHA`, and deploys to `dev`.
-   - The `deploy-infra-dev` trigger automatically runs `terraform apply -var-file="environments/dev.tfvars"`.
-
-2. **Promoting to Staging**:
-   - Create and push a Git tag:
-     ```bash
-     git tag v1.0.0
-     git push origin v1.0.0
-     ```
-   - Cloud Build automatically triggers `deploy-service-api-staging` and deploys the image to `staging`.
-
-3. **Promoting to Production (Manual Approval)**:
-   - The same tag triggers `deploy-service-api-prod` in a **Pending Approval** state.
-   - Go to [Cloud Build History](https://console.cloud.google.com/cloud-build/builds) in the GCP Console, review the pending build, and click **Approve**.
-   - Cloud Build deploys the verified image to **Production**.
-
----
-
-## 5. Adding a New Service
-
-To add a new service (e.g. `service-worker` or `service-web`):
-
-1. **Create the folder**:
-   ```bash
-   mkdir -p apps/service-worker
-   ```
-2. **Add application files**:
-   Add `main.py` (or Node.js/Go code), `Dockerfile`, `.dockerignore`, and `cloudbuild.yaml`.
-3. **Register in `infra/variables.tf` (or `terraform.tfvars`)**:
-   ```hcl
-   services = {
-     "service-api" = { ... },
-     "service-worker" = {
-       description  = "Worker service"
-       port         = 8080
-       allow_unauth = false
-       ingress      = "INGRESS_TRAFFIC_INTERNAL_ONLY"
-     }
-   }
-   ```
-4. **Create a Cloud Build Trigger**:
-   Target `apps/service-worker/**` pointing to `apps/service-worker/cloudbuild.yaml`.
-
----
-
-## 6. Security Best Practices
-
-- **Non-Root Containers**: Dockerfile creates and executes as a dedicated `appuser` (UID 1000).
-- **Least Privilege Runtime SA**: Each service has its own dedicated Service Account (`sa-${service_name}`) rather than sharing the default Compute Engine SA.
-- **Security Headers Middleware**: The API includes `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Strict-Transport-Security`.
-- **Private / Internal Ingress**: Internal microservices can set `ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"` and `allow_unauth = false`.
-- **Secrets Management**: For sensitive credentials (database passwords, API keys), mount them from **Google Secret Manager** directly into Cloud Run environment variables or volumes.
+| Path | Purpose |
+| :--- | :--- |
+| `infra/cloudbuild.yaml` | Primary Cloud Build trigger pipeline that runs `terraform init`, `terraform validate`, and `terraform plan` across both root `infra/` and `infra/udp/`. |
+| `infra/apis.tf` | Enables required GCP APIs (`bigquery.googleapis.com`, `run.googleapis.com`, `composer.googleapis.com`, `dataform.googleapis.com`, `secretmanager.googleapis.com`, `artifactregistry.googleapis.com`). |
+| `infra/artifact_registry.tf` | Provisions the Docker Artifact Registry repository (`ar-${var.project_id}-udp-images`) in `us-central1`. |
+| `infra/service_accounts.tf` & `infra/iam.tf` | Declares baseline project service accounts and least-privilege execution bindings (`roles/bigquery.jobUser`, `roles/run.invoker`). |
+| `infra/storage.tf` & `infra/storage_shared.tf` | Provisions foundational shared storage buckets for the core-apps project. |
+| `infra/main.tf`, `variables.tf`, `outputs.tf`, `backend.tf`, `versions.tf` | Root Terraform configuration, remote state backend (`gs://gcs-pid-ns-cmn-app-tfstate-iv0b`), and module outputs. |
