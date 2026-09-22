@@ -1,112 +1,116 @@
-# Copyright 2026 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# ==============================================================================
+# Cloud Build Pipeline: Standalone UDP Infrastructure (infra/udp/)
+# ==============================================================================
+# - Default Target Environment: Non-sensitive Stage GCP Project (pid-nse-stg-core-apps-k8ti)
+# - Isolated State File: gs://<STATE_BUCKET>/terraform/udp/state/default.tfstate
+# ==============================================================================
 
 steps:
-  - id: resolve-config
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    dir: infra/udp
-    entrypoint: bash
+  # 1. Resolve Environment & Terraform Init (infra/udp/)
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
     args:
-      - -c
+      - '-c'
       - |
-        set -euo pipefail
         RAW_ENV="${_ENVIRONMENT}"
-        TARGET_PROJECT_DEFAULT="${_TARGET_PROJECT_ID}"
-
-        case "${PROJECT_ID}" in
-          *dev*) ENVIRONMENT="development" ;;
-          *prd*) ENVIRONMENT="production" ;;
-          *stg*|*)
-            case "$${RAW_ENV}" in
-              prod|production) ENVIRONMENT="production" ;;
-              dev|development) ENVIRONMENT="development" ;;
-              stage|staging|*) ENVIRONMENT="staging" ;;
+        case "$PROJECT_ID" in
+          *dev*)
+            ENVIRONMENT="development"
+            ENVIRONMENT_SHORT="dev"
+            ;;
+          *prd*)
+            ENVIRONMENT="production"
+            ENVIRONMENT_SHORT="prd"
+            ;;
+          *)
+            case "$$RAW_ENV" in
+              dev|development)
+                ENVIRONMENT="development"
+                ENVIRONMENT_SHORT="dev"
+                ;;
+              prd|prod|production)
+                ENVIRONMENT="production"
+                ENVIRONMENT_SHORT="prd"
+                ;;
+              stg|stage|staging|*)
+                ENVIRONMENT="staging"
+                ENVIRONMENT_SHORT="stg"
+                ;;
             esac
             ;;
         esac
 
-        TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
-        TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$${TF_VARS_FILE}")
-        if [ -z "$${TARGET_PROJECT}" ]; then
-          TARGET_PROJECT="$${TARGET_PROJECT_DEFAULT}"
+        ENV_FILE="environments/$${ENVIRONMENT}.tfvars"
+        TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
+        if [ -z "$$TARGET_PROJECT_ID" ] && [ -f "$$ENV_FILE" ]; then
+          TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$ENV_FILE" | head -n 1)
         fi
-        STATE_BUCKET="gcs-$${TARGET_PROJECT}-tfstate"
+
+        STATE_BUCKET="${_STATE_BUCKET}"
+        if [ -z "$$STATE_BUCKET" ]; then
+          STATE_BUCKET="gcs-$${TARGET_PROJECT_ID}-tfstate"
+        fi
         UDP_STATE_PREFIX="${_UDP_STATE_PREFIX}"
 
-        cat <<EOF > /workspace/tf_udp_env.sh
-        export ENVIRONMENT="$${ENVIRONMENT}"
-        export TF_VARS_FILE="$${TF_VARS_FILE}"
-        export TARGET_PROJECT="$${TARGET_PROJECT}"
-        export STATE_BUCKET="$${STATE_BUCKET}"
-        export UDP_STATE_PREFIX="$${UDP_STATE_PREFIX}"
-        EOF
+        echo "ENVIRONMENT=$$ENVIRONMENT" > .env.udp.build
+        echo "ENV_FILE=$$ENV_FILE" >> .env.udp.build
+        echo "TARGET_PROJECT_ID=$$TARGET_PROJECT_ID" >> .env.udp.build
+        echo "STATE_BUCKET=$$STATE_BUCKET" >> .env.udp.build
+        echo "UDP_STATE_PREFIX=$$UDP_STATE_PREFIX" >> .env.udp.build
 
-        cat /workspace/tf_udp_env.sh
-
-  - id: terraform-init
-    name: hashicorp/terraform:1.9.8
-    dir: infra/udp
-    entrypoint: sh
-    args:
-      - -c
-      - |
-        set -eu
-        . /workspace/tf_udp_env.sh
         terraform init -reconfigure \
-          -backend-config="bucket=$${STATE_BUCKET}" \
-          -backend-config="prefix=$${UDP_STATE_PREFIX}"
+          -backend-config="bucket=$$STATE_BUCKET" \
+          -backend-config="prefix=$$UDP_STATE_PREFIX"
+    dir: 'infra/udp'
 
-  - id: terraform-validate
-    name: hashicorp/terraform:1.9.8
-    dir: infra/udp
-    entrypoint: sh
+  # 2. Validate & Plan (infra/udp/)
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
     args:
-      - -c
+      - '-c'
       - |
-        set -eu
+        . ./.env.udp.build
         terraform validate
+        terraform plan \
+          -out=tfplan \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT"
+    dir: 'infra/udp'
 
-  - id: terraform-plan
-    name: hashicorp/terraform:1.9.8
-    dir: infra/udp
-    entrypoint: sh
+  # 3. Apply (infra/udp/)
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
     args:
-      - -c
+      - '-c'
       - |
-        set -eu
-        . /workspace/tf_udp_env.sh
-        terraform plan -no-color -input=false -var-file="$${TF_VARS_FILE}" -out=udp_tfplan
-
-  - id: terraform-apply
-    name: hashicorp/terraform:1.9.8
-    dir: infra/udp
-    entrypoint: sh
-    args:
-      - -c
-      - |
-        set -eu
-        if [ "${_ACTION}" = "apply" ]; then
-          terraform apply -no-color -input=false -auto-approve udp_tfplan
-        else
-          echo "Skipping infra/udp/ terraform apply because _ACTION='${_ACTION}'."
+        . ./.env.udp.build
+        SHOULD_APPLY=false
+        if [ "${_TF_ACTION}" = "apply" ]; then
+          SHOULD_APPLY=true
+        elif [ "${_TF_ACTION}" = "plan" ]; then
+          SHOULD_APPLY=false
+        elif [ "${_TF_ACTION}" = "auto" ] || [ -z "${_TF_ACTION}" ]; then
+          if [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "stage" ] || [ "$BRANCH_NAME" = "staging" ] || [ -n "$TAG_NAME" ]; then
+            SHOULD_APPLY=true
+          fi
         fi
 
+        if [ "$$SHOULD_APPLY" != "true" ]; then
+          echo "Skipping UDP terraform apply (planning only)."
+          exit 0
+        fi
+
+        terraform apply -auto-approve tfplan
+    dir: 'infra/udp'
+
 substitutions:
+  _TF_ACTION: 'auto'
   _ENVIRONMENT: 'staging'
-  _TARGET_PROJECT_ID: 'pid-nse-stg-core-apps-k8ti'
-  _ACTION: 'plan'
+  _TARGET_PROJECT_ID: ''
   _UDP_STATE_PREFIX: 'terraform/udp/state'
+  _STATE_BUCKET: ''
+  _REGION: 'us-central1'
 
 options:
   logging: CLOUD_LOGGING_ONLY
