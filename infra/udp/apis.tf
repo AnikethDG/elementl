@@ -12,25 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Root UDP & Application APIs
+# Required Google Cloud APIs for Unified Data Platform (apps/udp & infra/udp)
 locals {
-  udp_apis = [
-    "bigquery.googleapis.com",
-    "bigquerystorage.googleapis.com",
-    "bigquerydatatransfer.googleapis.com",
-    "dataform.googleapis.com",
-    "composer.googleapis.com",
-    "run.googleapis.com",
+  udp_required_apis = toset([
     "artifactregistry.googleapis.com",
-    "secretmanager.googleapis.com",
-    "cloudscheduler.googleapis.com",
+    "bigquery.googleapis.com",
     "cloudbuild.googleapis.com",
+    "composer.googleapis.com",
+    "dataform.googleapis.com",
+    "iam.googleapis.com",
+    "run.googleapis.com",
+    "secretmanager.googleapis.com",
+    "sourcemanager.googleapis.com",
     "storage.googleapis.com",
-  ]
+  ])
 }
 
 resource "google_project_service" "udp_apis" {
-  for_each           = toset(local.udp_apis)
+  for_each           = local.udp_required_apis
   project            = var.project_id
   service            = each.key
   disable_on_destroy = false

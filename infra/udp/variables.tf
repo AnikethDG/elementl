@@ -42,8 +42,26 @@ variable "vpc_subnet" {
   default     = "projects/pid-ns-npd-us-netw-ucyd/regions/us-central1/subnetworks/sub-ns-stg-usc1"
 }
 
+variable "artifact_registry_repo_id" {
+  description = "Docker Artifact Registry repository ID supporting the 4 Cloud Run Jobs in apps/udp/cloud-run-jobs/"
+  type        = string
+  default     = "udp-ingestion-jobs"
+}
+
+variable "image_tag" {
+  description = "Default Docker image tag in Artifact Registry for the 4 Cloud Run Jobs"
+  type        = string
+  default     = "latest"
+}
+
 variable "enable_composer" {
-  description = "Whether to provision the Cloud Composer 3 environment via Terraform"
+  description = "Whether to provision the Cloud Composer 3 Medium environment via Terraform"
   type        = bool
-  default     = false
+  default     = true
+}
+
+variable "composer_image_version" {
+  description = "Cloud Composer 3 + Apache Airflow 3 image version"
+  type        = string
+  default     = "composer-3-airflow-3"
 }

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Consolidated Project BigQuery Datasets (Bronze, Silver, Gold, Assertions, Metadata)
+# Consolidated Project BigQuery Datasets & Bronze/Operational Tables (100% Terraform-Managed)
 locals {
   udp_datasets = {
     # Standardized Naming Convention Datasets (Elementl UDP Naming Convention Doc + Per-Source Silver Split)
@@ -26,25 +26,69 @@ locals {
     ds_dataform_assertions = "Dataform data quality assertions failed records (Bronze-to-Silver validation)"
     ds_operations          = "Operational metadata table driving DAG Factory, watermarks, and framework audit logs"
     ds_atlas_analytics     = "Exposed analytics views, site suitability parameters, and AI search tables for Project Atlas"
+  }
 
-    # Legacy / Retained Datasets (preserved in state to avoid destructive replacement)
-    raw_p6              = "Bronze raw landing dataset for Oracle Primavera P6 (ELEMENTL_PMDB_SBOX_PXRPTUSER)"
-    raw_netsuite        = "Bronze raw landing dataset for Oracle NetSuite (SuiteQL 11 tables)"
-    raw_atlas           = "Bronze raw landing dataset for Atlas GIS & Tabular (envelope schema + layers)"
-    silver_p6           = "Silver 1:1 conformed models for Oracle Primavera P6"
-    silver_netsuite     = "Silver 1:1 conformed models for Oracle NetSuite"
-    silver_atlas        = "Silver 1:1 conformed models for Atlas GIS & Tabular"
-    gold_analytics      = "Gold cross-domain analytical marts and executive views"
-    dataform_assertions = "Dataform data quality assertions (Bronze-to-Silver validation)"
-    udp_metadata        = "UDP pipeline watermarks, audit logs, and reconciliation telemetry"
+  # Discover all 15 P6 Bronze schemas and 11 NetSuite Bronze schemas from apps/udp/configs/schema/
+  p6_schema_files = {
+    for f in fileset("${path.module}/../../apps/udp/configs/schema/p6", "p6_*_schema.json") :
+    replace(replace(f, "p6_", ""), "_schema.json", "") => "${path.module}/../../apps/udp/configs/schema/p6/${f}"
+  }
+
+  netsuite_schema_files = {
+    for f in fileset("${path.module}/../../apps/udp/configs/schema/netsuite", "netsuite_*_schema.json") :
+    replace(replace(f, "netsuite_", ""), "_schema.json", "") => "${path.module}/../../apps/udp/configs/schema/netsuite/${f}"
   }
 }
 
 resource "google_bigquery_dataset" "datasets" {
+  depends_on                 = [google_project_service.udp_apis]
   for_each                   = local.udp_datasets
   project                    = var.project_id
   dataset_id                 = each.key
   location                   = var.region
   description                = each.value
   delete_contents_on_destroy = false
+}
+
+# Terraform-Managed Bronze Tables for Oracle Primavera P6 (15 tables in ds_bronze_p6)
+resource "google_bigquery_table" "bronze_p6_tables" {
+  for_each            = local.p6_schema_files
+  project             = var.project_id
+  dataset_id          = google_bigquery_dataset.datasets["ds_bronze_p6"].dataset_id
+  table_id            = each.key
+  description         = "Bronze landing table for Oracle Primavera P6 ELEMENTL_PMDB_SBOX_PXRPTUSER.${upper(each.key)}"
+  schema              = file(each.value)
+  deletion_protection = false
+}
+
+# Terraform-Managed Bronze Tables for Oracle NetSuite (11 tables in ds_bronze_netsuite)
+resource "google_bigquery_table" "bronze_netsuite_tables" {
+  for_each            = local.netsuite_schema_files
+  project             = var.project_id
+  dataset_id          = google_bigquery_dataset.datasets["ds_bronze_netsuite"].dataset_id
+  table_id            = each.key
+  description         = "Bronze landing table for Oracle NetSuite SuiteQL ${each.key}"
+  schema              = file(each.value)
+  deletion_protection = false
+}
+
+# Terraform-Managed Operational Audit Table (ds_operations.audit_ingestion_runs)
+resource "google_bigquery_table" "audit_ingestion_runs" {
+  project             = var.project_id
+  dataset_id          = google_bigquery_dataset.datasets["ds_operations"].dataset_id
+  table_id            = "audit_ingestion_runs"
+  description         = "UDP framework ingestion telemetry, execution status, and watermark tracking table"
+  deletion_protection = false
+  schema = jsonencode([
+    { name = "run_id", type = "STRING", mode = "REQUIRED", description = "Unique execution run identifier" },
+    { name = "source_system", type = "STRING", mode = "NULLABLE", description = "Source system (p6, netsuite, atlas)" },
+    { name = "source_table", type = "STRING", mode = "NULLABLE", description = "Canonical table or layer identifier" },
+    { name = "target_dataset", type = "STRING", mode = "NULLABLE", description = "Target Bronze BigQuery dataset" },
+    { name = "target_table", type = "STRING", mode = "NULLABLE", description = "Target Bronze BigQuery table" },
+    { name = "status", type = "STRING", mode = "NULLABLE", description = "Execution status (SUCCESS, FAILED, RUNNING)" },
+    { name = "records_extracted", type = "INT64", mode = "NULLABLE", description = "Number of records extracted and loaded" },
+    { name = "gcs_uri", type = "STRING", mode = "NULLABLE", description = "GCS landing staging URI" },
+    { name = "started_at", type = "TIMESTAMP", mode = "NULLABLE", description = "Job start timestamp (UTC)" },
+    { name = "completed_at", type = "TIMESTAMP", mode = "NULLABLE", description = "Job completion timestamp (UTC)" }
+  ])
 }
