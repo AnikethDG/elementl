@@ -21,24 +21,28 @@ steps:
       - -c
       - |
         set -euo pipefail
-        # Default to non-sensitive staging GCP project (pid-nse-stg-core-apps-k8ti)
-        ENVIRONMENT="staging"
-        TF_VARS_FILE="environments/staging.tfvars"
-        TARGET_PROJECT="pid-nse-stg-core-apps-k8ti"
-        STATE_BUCKET="gcs-pid-nse-stg-core-apps-k8ti-tfstate"
-        UDP_STATE_PREFIX="${_UDP_STATE_PREFIX:-terraform/udp/state}"
+        RAW_ENV="${_ENVIRONMENT}"
+        TARGET_PROJECT_DEFAULT="${_TARGET_PROJECT_ID}"
 
-        if ! gcloud storage ls "gs://$${STATE_BUCKET}" >/dev/null 2>&1; then
-          echo "Staging state bucket gs://$${STATE_BUCKET} not accessible by current runner SA; falling back to trigger project (${PROJECT_ID})."
-          case "${PROJECT_ID}" in
-            *prd*) ENVIRONMENT="production" ;;
-            *stg*) ENVIRONMENT="staging" ;;
-            *)     ENVIRONMENT="development" ;;
-          esac
-          TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
-          TARGET_PROJECT="${PROJECT_ID}"
-          STATE_BUCKET="gcs-$${TARGET_PROJECT}-tfstate"
+        case "${PROJECT_ID}" in
+          *dev*) ENVIRONMENT="development" ;;
+          *prd*) ENVIRONMENT="production" ;;
+          *stg*|*)
+            case "$${RAW_ENV}" in
+              prod|production) ENVIRONMENT="production" ;;
+              dev|development) ENVIRONMENT="development" ;;
+              stage|staging|*) ENVIRONMENT="staging" ;;
+            esac
+            ;;
+        esac
+
+        TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
+        TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$${TF_VARS_FILE}")
+        if [ -z "$${TARGET_PROJECT}" ]; then
+          TARGET_PROJECT="$${TARGET_PROJECT_DEFAULT}"
         fi
+        STATE_BUCKET="gcs-$${TARGET_PROJECT}-tfstate"
+        UDP_STATE_PREFIX="${_UDP_STATE_PREFIX}"
 
         cat <<EOF > /workspace/tf_udp_env.sh
         export ENVIRONMENT="$${ENVIRONMENT}"

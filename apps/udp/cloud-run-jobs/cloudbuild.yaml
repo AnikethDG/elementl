@@ -14,15 +14,16 @@
 
 # Unified Cloud Build pipeline for building & pushing all 4 UDP Cloud Run Job Docker images
 # from apps/udp/cloud-run-jobs/ to the Terraform-managed Artifact Registry (udp-ingestion-jobs)
+# in the non-sensitive staging GCP project (pid-nse-stg-core-apps-k8ti).
 steps:
   - id: 'build-arcgis-ingestion'
     name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:${_TAG}'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:${_TAG}'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:latest'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:latest'
       - '-f'
       - 'arcgis-ingestion/Dockerfile'
       - '.'
@@ -32,9 +33,9 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:${_TAG}'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:${_TAG}'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:latest'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:latest'
       - '-f'
       - 'bulk-ingestion/Dockerfile'
       - '.'
@@ -44,9 +45,9 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:${_TAG}'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:${_TAG}'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:latest'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:latest'
       - '-f'
       - 'suiteQL-ingestion/Dockerfile'
       - '.'
@@ -56,25 +57,26 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:${_TAG}'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:${_TAG}'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:latest'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:latest'
       - '-f'
       - 'jdbc-ingestion/Dockerfile'
       - '.'
 
 images:
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:${_TAG}'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:latest'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:${_TAG}'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:latest'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:${_TAG}'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:latest'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:${_TAG}'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:latest'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:latest'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:latest'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:latest'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:latest'
 
 substitutions:
   _REGION: 'us-central1'
+  _TARGET_PROJECT_ID: 'pid-nse-stg-core-apps-k8ti'
   _REPOSITORY: 'udp-ingestion-jobs'
   _TAG: 'latest'
 

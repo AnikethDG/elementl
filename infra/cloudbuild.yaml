@@ -22,41 +22,48 @@ steps:
       - |
         set -euo pipefail
 
-        # Default to non-sensitive staging GCP project (pid-nse-stg-core-apps-k8ti)
-        ENVIRONMENT="staging"
-        ENVIRONMENT_SHORT="stg"
-        TF_VARS_FILE="environments/staging.tfvars"
-        UDP_TF_VARS_FILE="environments/staging.tfvars"
-        TARGET_PROJECT="pid-nse-stg-core-apps-k8ti"
-        STATE_BUCKET="gcs-pid-nse-stg-core-apps-k8ti-tfstate"
+        # Default target environment is the non-sensitive staging GCP project (pid-nse-stg-core-apps-k8ti).
+        # When triggered inside a project-scoped Cloud Build runner (e.g. pid-nse-dev-core-apps-dz09 for PR checks
+        # or pid-nse-stg-core-apps-k8ti for stage deployments), match the runner's project credentials if restricted.
+        RAW_ENV="${_ENVIRONMENT}"
+        TARGET_PROJECT_DEFAULT="${_TARGET_PROJECT_ID}"
 
-        # Verify if the active Cloud Build runner service account has access to the staging state bucket.
-        # If running inside an isolated dev-only PR trigger SA without cross-project access to staging,
-        # gracefully fall back to the trigger project's state bucket for CI validation.
-        if ! gcloud storage ls "gs://$${STATE_BUCKET}" >/dev/null 2>&1; then
-          echo "Staging state bucket gs://$${STATE_BUCKET} not accessible by current runner SA; falling back to trigger project (${PROJECT_ID}) for CI plan."
-          case "${PROJECT_ID}" in
-            *prd*)
-              ENVIRONMENT="production"
-              ENVIRONMENT_SHORT="prd"
-              ;;
-            *stg*)
-              ENVIRONMENT="staging"
-              ENVIRONMENT_SHORT="stg"
-              ;;
-            *)
-              ENVIRONMENT="development"
-              ENVIRONMENT_SHORT="dev"
-              ;;
-          esac
-          TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
-          UDP_TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
-          TARGET_PROJECT="${PROJECT_ID}"
-          STATE_BUCKET="gcs-$${TARGET_PROJECT}-tfstate"
+        case "${PROJECT_ID}" in
+          *dev*)
+            ENVIRONMENT="development"
+            ENVIRONMENT_SHORT="dev"
+            ;;
+          *prd*)
+            ENVIRONMENT="production"
+            ENVIRONMENT_SHORT="prd"
+            ;;
+          *stg*|*)
+            case "$${RAW_ENV}" in
+              prod|production)
+                ENVIRONMENT="production"
+                ENVIRONMENT_SHORT="prd"
+                ;;
+              dev|development)
+                ENVIRONMENT="development"
+                ENVIRONMENT_SHORT="dev"
+                ;;
+              stage|staging|*)
+                ENVIRONMENT="staging"
+                ENVIRONMENT_SHORT="stg"
+                ;;
+            esac
+            ;;
+        esac
+
+        TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
+        UDP_TF_VARS_FILE="environments/$${ENVIRONMENT}.tfvars"
+        TARGET_PROJECT=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$${TF_VARS_FILE}")
+        if [ -z "$${TARGET_PROJECT}" ]; then
+          TARGET_PROJECT="$${TARGET_PROJECT_DEFAULT}"
         fi
-
-        STATE_PREFIX="${_STATE_PREFIX:-terraform/infra/state}"
-        UDP_STATE_PREFIX="${_UDP_STATE_PREFIX:-terraform/udp/state}"
+        STATE_BUCKET="gcs-$${TARGET_PROJECT}-tfstate"
+        STATE_PREFIX="${_STATE_PREFIX}"
+        UDP_STATE_PREFIX="${_UDP_STATE_PREFIX}"
 
         cat <<EOF > /workspace/tf_env.sh
         export ENVIRONMENT="$${ENVIRONMENT}"
