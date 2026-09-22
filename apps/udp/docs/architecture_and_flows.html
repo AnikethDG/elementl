@@ -1,0 +1,2294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elementl Ingestion Framework - Architecture & Engineering Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Text:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="assets/mermaid.min.js"></script>
+  <script>
+    if (typeof mermaid === "undefined") {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"><\/script>');
+    }
+  </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      if (typeof mermaid !== "undefined") {
+        mermaid.initialize({
+          startOnLoad: true,
+          theme: 'default',
+          securityLevel: 'loose',
+          themeVariables: {
+            fontSize: '16px',
+            fontFamily: 'Google Sans Text, Roboto, sans-serif',
+            primaryColor: '#e8f0fe',
+            primaryBorderColor: '#1a73e8',
+            primaryTextColor: '#202124',
+            lineColor: '#1a73e8',
+            secondaryColor: '#f1f3f4',
+            tertiaryColor: '#fef7e0',
+            clusterBkg: '#f8f9fa',
+            clusterBorder: '#dadce0',
+            edgeLabelBackground: '#ffffff',
+            actorFontSize: '16px',
+            actorLineColor: '#1a73e8',
+            signalFontSize: '15px'
+          },
+          flowchart: {
+            useMaxWidth: false,
+            htmlLabels: true,
+            curve: 'basis',
+            nodeSpacing: 55,
+            rankSpacing: 55
+          },
+          sequence: {
+            useMaxWidth: false,
+            showSequenceNumbers: true,
+            boxMargin: 18,
+            messageMargin: 42
+          }
+        });
+      }
+    });
+  </script>
+  <style>
+    :root {
+      --gcp-blue: #1a73e8;
+      --gcp-blue-light: #e8f0fe;
+      --gcp-blue-dark: #174ea6;
+      --gcp-red: #d93025;
+      --gcp-red-light: #fce8e6;
+      --gcp-yellow: #f9ab00;
+      --gcp-yellow-light: #fef7e0;
+      --gcp-green: #1e8e3e;
+      --gcp-green-light: #e6f4ea;
+      --gcp-grey-50: #f8f9fa;
+      --gcp-grey-100: #f1f3f4;
+      --gcp-grey-200: #e8eaed;
+      --gcp-grey-300: #dadce0;
+      --gcp-grey-700: #5f6368;
+      --gcp-grey-800: #3c4043;
+      --gcp-grey-900: #202124;
+      --surface: #ffffff;
+      --shadow-1: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+      --shadow-2: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+      --shadow-3: 0 8px 24px rgba(0,0,0,0.12);
+      --radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Google Sans Text', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--gcp-grey-900);
+      background-color: var(--gcp-grey-50);
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Top Navigation */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--gcp-grey-300);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .nav-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--gcp-grey-900);
+    }
+
+    .brand-logo svg {
+      width: 30px;
+      height: 30px;
+    }
+
+    .brand-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--gcp-grey-900);
+    }
+
+    .brand-subtitle {
+      font-size: 0.82rem;
+      color: var(--gcp-blue);
+      background: var(--gcp-blue-light);
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 12px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--gcp-grey-700);
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover, .nav-links a.active {
+      color: var(--gcp-blue);
+      background: var(--gcp-blue-light);
+    }
+
+    /* Layout */
+    .app-layout {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: flex;
+      flex: 1;
+      width: 100%;
+      padding: 24px;
+      gap: 28px;
+    }
+
+    /* Sidebar Table of Contents */
+    aside.toc-sidebar {
+      width: 290px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border: 1px solid var(--gcp-grey-300);
+      border-radius: var(--radius);
+      padding: 20px;
+      height: fit-content;
+      position: sticky;
+      top: 80px;
+      box-shadow: var(--shadow-1);
+    }
+
+    .toc-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--gcp-grey-700);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--gcp-grey-200);
+    }
+
+    .toc-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .toc-list a {
+      text-decoration: none;
+      color: var(--gcp-grey-800);
+      font-size: 0.88rem;
+      padding: 6px 10px;
+      border-radius: 6px;
+      display: block;
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+    }
+
+    .toc-list a:hover {
+      background: var(--gcp-grey-100);
+      color: var(--gcp-blue);
+      border-left: 3px solid var(--gcp-blue);
+    }
+
+    /* Main Content */
+    main.content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      min-width: 0;
+    }
+
+    /* Cards & Sections */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--gcp-grey-300);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: var(--shadow-1);
+      scroll-margin-top: 90px;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-2);
+      transition: box-shadow 0.2s ease-in-out;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: 'Google Sans', sans-serif;
+      color: var(--gcp-grey-900);
+    }
+
+    h1 {
+      font-size: 2.1rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 22px 0 10px 0;
+    }
+
+    p {
+      color: var(--gcp-grey-800);
+      margin-bottom: 14px;
+      font-size: 0.96rem;
+    }
+
+    /* Hero Banner */
+    .hero-banner {
+      background: linear-gradient(135deg, #1a73e8 0%, #174ea6 100%);
+      color: white;
+      border-radius: var(--radius);
+      padding: 36px;
+      box-shadow: var(--shadow-2);
+    }
+
+    .hero-banner h1 {
+      color: white;
+      font-size: 2.3rem;
+    }
+
+    .hero-banner p {
+      color: rgba(255,255,255,0.92);
+      font-size: 1.05rem;
+      max-width: 950px;
+      margin-top: 10px;
+    }
+
+    .hero-badges {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .hero-badge {
+      background: rgba(255,255,255,0.18);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.35);
+      color: white;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.84rem;
+      font-weight: 500;
+    }
+
+    /* Diagram Containers with Click-to-Zoom */
+    .diagram-wrapper {
+      position: relative;
+      margin: 22px 0;
+    }
+
+    .diagram-box {
+      background: #ffffff;
+      border: 1.5px solid var(--gcp-grey-300);
+      border-radius: var(--radius);
+      padding: 36px 28px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 380px;
+      cursor: zoom-in;
+      position: relative;
+      transition: all 0.25s ease;
+      box-shadow: inset 0 0 14px rgba(0,0,0,0.02);
+      user-select: none;
+    }
+
+    .diagram-box:hover {
+      border-color: var(--gcp-blue);
+      box-shadow: 0 8px 28px rgba(26, 115, 232, 0.20);
+      transform: translateY(-2px);
+    }
+
+    .diagram-box:hover .zoom-badge {
+      opacity: 1;
+      background: var(--gcp-blue-dark);
+      transform: scale(1.05);
+      box-shadow: 0 4px 14px rgba(26, 115, 232, 0.35);
+    }
+
+    .diagram-box svg {
+      width: auto !important;
+      max-width: 100% !important;
+      min-width: min(100%, 800px);
+      height: auto !important;
+      min-height: 280px;
+      display: block;
+      margin: 0 auto;
+      pointer-events: none;
+    }
+
+    .zoom-badge {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: var(--gcp-blue);
+      color: white;
+      padding: 8px 18px;
+      border-radius: 24px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      opacity: 0.92;
+      transition: all 0.2s ease;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .diagram-caption {
+      font-size: 0.86rem;
+      color: var(--gcp-grey-700);
+      text-align: center;
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* Interactive Tabs */
+    .tab-container {
+      margin: 18px 0;
+    }
+
+    .tab-nav {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--gcp-grey-200);
+      margin-bottom: 18px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--gcp-grey-700);
+      padding: 10px 18px;
+      cursor: pointer;
+      position: relative;
+      bottom: -2px;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--gcp-blue);
+    }
+
+    .tab-btn.active {
+      color: var(--gcp-blue);
+      border-bottom: 3px solid var(--gcp-blue);
+      font-weight: 700;
+    }
+
+    .tab-pane {
+      display: block;
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      visibility: hidden;
+      height: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .tab-pane.active {
+      position: static;
+      left: auto;
+      top: auto;
+      visibility: visible;
+      height: auto;
+      overflow: visible;
+      pointer-events: auto;
+      animation: fadeIn 0.25s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Steps List */
+    .step-list {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      margin: 18px 0;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 18px;
+      background: var(--gcp-grey-50);
+      border: 1px solid var(--gcp-grey-200);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .step-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--gcp-blue);
+      color: white;
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 700;
+      font-size: 1.05rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(26,115,232,0.3);
+    }
+
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.08rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--gcp-grey-900);
+    }
+
+    /* Code Blocks */
+    pre, code {
+      font-family: 'Roboto Mono', monospace;
+    }
+
+    pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 18px;
+      border-radius: var(--radius);
+      overflow-x: auto;
+      font-size: 0.86rem;
+      margin: 12px 0;
+      line-height: 1.5;
+    }
+
+    p code, li code, td code {
+      background: var(--gcp-grey-100);
+      color: #c7254e;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.88em;
+    }
+
+    /* Callout Alerts */
+    .callout {
+      padding: 16px 20px;
+      border-radius: var(--radius);
+      margin: 16px 0;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      font-size: 0.94rem;
+    }
+
+    .callout-info {
+      background: var(--gcp-blue-light);
+      border-left: 4px solid var(--gcp-blue);
+      color: #174ea6;
+    }
+
+    .callout-success {
+      background: var(--gcp-green-light);
+      border-left: 4px solid var(--gcp-green);
+      color: #137333;
+    }
+
+    .callout-warning {
+      background: var(--gcp-yellow-light);
+      border-left: 4px solid var(--gcp-yellow);
+      color: #b06000;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      padding: 13px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--gcp-grey-200);
+    }
+
+    th {
+      background: var(--gcp-grey-100);
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 700;
+      color: var(--gcp-grey-800);
+    }
+
+    tr:hover td {
+      background: var(--gcp-grey-50);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-blue { background: var(--gcp-blue-light); color: var(--gcp-blue); }
+    .badge-green { background: var(--gcp-green-light); color: var(--gcp-green); }
+    .badge-yellow { background: var(--gcp-yellow-light); color: #b06000; }
+    .badge-red { background: var(--gcp-red-light); color: var(--gcp-red); }
+
+    /* ============================================================
+       Interactive Lightbox Modal with Pan, Zoom, Reset, & Controls
+       ============================================================ */
+    .lightbox-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lightbox-modal.active {
+      display: flex !important;
+    }
+
+    .lightbox-backdrop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(10px);
+    }
+
+    .lightbox-content {
+      position: relative;
+      background: #ffffff;
+      width: 95vw;
+      height: 92vh;
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      z-index: 1001;
+      overflow: hidden;
+      animation: modalScale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalScale {
+      from { transform: scale(0.94); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .lightbox-header {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--gcp-grey-300);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--gcp-grey-50);
+      flex-shrink: 0;
+    }
+
+    .lightbox-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--gcp-grey-900);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .lightbox-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .zoom-level-pill {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: var(--gcp-grey-200);
+      color: var(--gcp-grey-800);
+      padding: 5px 10px;
+      border-radius: 16px;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .ctrl-btn {
+      background: var(--surface);
+      border: 1px solid var(--gcp-grey-300);
+      border-radius: 6px;
+      padding: 6px 13px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--gcp-grey-800);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .ctrl-btn:hover {
+      background: var(--gcp-blue-light);
+      color: var(--gcp-blue);
+      border-color: var(--gcp-blue);
+    }
+
+    .ctrl-btn.close-btn {
+      background: var(--gcp-red-light);
+      color: var(--gcp-red);
+      border-color: rgba(217, 48, 37, 0.3);
+      margin-left: 6px;
+    }
+
+    .ctrl-btn.close-btn:hover {
+      background: var(--gcp-red);
+      color: white;
+    }
+
+    .lightbox-body {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #fafbfc;
+      user-select: none;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lightbox-body.dark-mode {
+      background: #121824;
+    }
+
+    .lightbox-body.dark-mode .lightbox-svg-container svg,
+    .lightbox-body.dark-mode .lightbox-svg-container img {
+      background: #1a2233;
+      border: 1px solid #334155;
+    }
+
+    .lightbox-body:active {
+      cursor: grabbing;
+    }
+
+    .lightbox-viewport {
+      transform-origin: center center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      will-change: transform;
+    }
+
+    .lightbox-svg-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lightbox-svg-container svg {
+      max-width: none !important;
+      min-width: 0 !important;
+      background: #ffffff;
+      padding: 36px 48px;
+      border-radius: 14px;
+      box-shadow: 0 14px 44px rgba(0,0,0,0.22);
+      pointer-events: auto;
+      box-sizing: content-box;
+    }
+
+    .lightbox-svg-container img {
+      max-width: none !important;
+      min-width: 0 !important;
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 14px;
+      box-shadow: 0 14px 44px rgba(0,0,0,0.22);
+      pointer-events: auto;
+    }
+
+    .lightbox-hints {
+      position: absolute;
+      bottom: 14px;
+      left: 20px;
+      font-size: 0.82rem;
+      color: var(--gcp-grey-700);
+      background: rgba(255, 255, 255, 0.85);
+      padding: 4px 12px;
+      border-radius: 16px;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      pointer-events: none;
+    }
+
+    /* Footer */
+    footer {
+      background: var(--surface);
+      border-top: 1px solid var(--gcp-grey-300);
+      padding: 24px;
+      text-align: center;
+      font-size: 0.88rem;
+      color: var(--gcp-grey-700);
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="nav-container">
+      <a href="#overview" class="brand">
+        <span class="brand-logo">
+          <svg viewBox="0 0 24 24" fill="#1a73e8">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+          </svg>
+        </span>
+        <span class="brand-title">Elementl Power Data Platform</span>
+        <span class="brand-subtitle">GCP Ingestion &amp; Transformation Framework</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#overview" class="active">Overview</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#adding-tables">Adding Tables</a></li>
+        <li><a href="#dag-lifecycle">DAG Lifecycle</a></li>
+        <li><a href="#dataform">Dataform (Silver)</a></li>
+        <li><a href="#observability">Observability</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- App Layout -->
+  <div class="app-layout">
+    <!-- Sidebar Table of Contents -->
+    <aside class="toc-sidebar">
+      <div class="toc-title">Navigation Index</div>
+      <ul class="toc-list">
+        <li><a href="#overview">1. Executive Overview</a></li>
+        <li><a href="#architecture">2. Medallion Architecture</a></li>
+        <li><a href="#engine-matrix">3. Dual Ingestion Engines</a></li>
+        <li><a href="#adding-tables">4. Adding New Tables &amp; Sources</a></li>
+        <li><a href="#step-netsuite">↳ Walkthrough: NetSuite</a></li>
+        <li><a href="#step-p6">↳ Walkthrough: Primavera P6</a></li>
+        <li><a href="#step-atlas">↳ Walkthrough: Elementl Atlas (HTTP)</a></li>
+        <li><a href="#dag-lifecycle">5. DAG Generator Lifecycle</a></li>
+        <li><a href="#code-reflection">6. Code Change Reflection Flow</a></li>
+        <li><a href="#task-trace">7. TaskGroup Execution Trace</a></li>
+        <li><a href="#dataform">8. Dataform (Raw &rarr; Silver)</a></li>
+        <li><a href="#schema-evolution">9. Schema Evolution (NetSuite &amp; P6)</a></li>
+        <li><a href="#observability">10. Auditing &amp; Monitoring</a></li>
+        <li><a href="#troubleshooting">11. Operational Runbook</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+
+      <!-- Hero Banner -->
+      <section class="hero-banner" id="overview">
+        <h1>Enterprise GCP Data Ingestion Framework</h1>
+        <p>A declarative, metadata-driven replication and transformation engine built for NetSuite ERP, Oracle Primavera P6 (JDBC), and Elementl Atlas (HTTP Siting APIs) into Google Cloud Storage and BigQuery, orchestrated with Cloud Composer and Dataform.</p>
+        <div class="hero-badges">
+          <span class="hero-badge">Google Cloud Native</span>
+          <span class="hero-badge">Medallion Architecture</span>
+          <span class="hero-badge">1 DAG Per Ingestion Task</span>
+          <span class="hero-badge">Cloud Run + Dataflow</span>
+          <span class="hero-badge">Dataform (Raw &rarr; Silver)</span>
+          <span class="hero-badge">Click Any Diagram to Zoom</span>
+        </div>
+      </section>
+
+      <!-- Section 1: Architecture -->
+      <section class="card" id="architecture">
+        <h2>
+          <span class="badge badge-blue">Architecture</span>
+          End-to-End Medallion Data Pipeline
+        </h2>
+        <p>The framework separates compute and storage across Bronze (Raw Landing) and Silver (Conformed &amp; Cleansed) layers, governed by Google Secret Manager, Cloud Composer, and BigQuery Audit Telemetry. <strong>(Click anywhere on the diagram below to open the interactive full-screen HD zoom viewer)</strong></p>
+
+        <div class="diagram-wrapper">
+          <div class="diagram-box" data-title="End-to-End Medallion Data Architecture (Google Cloud Native)">
+            <div class="zoom-badge">
+              🔍 Click to Zoom &amp; Pan (Full Screen HD)
+            </div>
+            <pre class="mermaid">
+flowchart TD
+  subgraph SEC["Governance and Security Layer"]
+    GSM["Google Secret Manager<br/>(OAuth Tokens, API Keys, Passwords)"]
+    AUDIT_TBL["BigQuery Audit and Watermarks<br/>(audit_metadata.ingestion_execution_logs)"]
+  end
+
+  subgraph SOURCES["1. Enterprise Source Systems"]
+    SRC_NS["NetSuite ERP<br/>(SuiteQL / TBA Token Auth)"]
+    SRC_P6["Oracle Primavera P6<br/>(Oracle Database / JDBC)"]
+    SRC_AT["Elementl Atlas Siting Platform<br/>(ArcGIS REST / Tabular HTTP APIs)"]
+  end
+
+  subgraph ENGINES["2. Dual Serverless Ingestion Engines"]
+    CRF["Cloud Run Functions<br/>(Micro-batch under 1M rows, serverless HTTP)"]
+    DF["Dataflow Flex Templates<br/>(Apache Beam, distributed workers over 1M rows)"]
+  end
+
+  subgraph GCS_LAYER["3. GCS Landing Lakehouse (Bronze Object Storage)"]
+    GCS["gs://landing-bucket/source/task/ingestion_date=YYYY-MM-DD/<br/>(Snappy Parquet / Compressed JSONL)"]
+  end
+
+  subgraph BRONZE_BQ["4. BigQuery Bronze (Raw Landing Layer)"]
+    BQ_NS["raw_netsuite.*<br/>(Day-Partitioned)"]
+    BQ_P6["raw_p6.*<br/>(Day-Partitioned)"]
+    BQ_AT["raw_atlas.*<br/>(Day-Partitioned)"]
+  end
+
+  subgraph SILVER_DF["5. BigQuery Silver (Dataform Conformed Layer)"]
+    SLV_NS["silver_netsuite.*<br/>(fct_transactions, dim_accounts)"]
+    SLV_P6["silver_p6.*<br/>(dim_projects, fct_activities)"]
+    SLV_AT["silver_atlas.*<br/>(fct_capable_faults, dim_population_density)"]
+    ASSERTS["Dataform Quality Assertions<br/>(Uniqueness, Referential Integrity, Safe Range)"]
+  end
+
+  GSM -.->|Inject Credentials| CRF
+  GSM -.->|Inject Credentials| DF
+
+  SRC_NS -->|HTTPS SuiteQL| CRF
+  SRC_P6 -->|Oracle JDBC Thin| CRF
+  SRC_P6 -->|Parallel JDBC Query| DF
+  SRC_AT -->|HTTP REST ArcGIS Query| CRF
+  SRC_AT -->|Parallel HTTP Range Query| DF
+
+  CRF -->|Stream Snappy Parquet| GCS
+  DF -->|Parallel Sharded Parquet| GCS
+
+  GCS -->|BigQuery Batch Load Job| BQ_NS
+  GCS -->|BigQuery Batch Load Job| BQ_P6
+  GCS -->|BigQuery Batch Load Job| BQ_AT
+
+  BQ_NS -->|Dataform SQLX Transformation| SLV_NS
+  BQ_P6 -->|Dataform SQLX Transformation| SLV_P6
+  BQ_AT -->|Dataform SQLX Transformation| SLV_AT
+
+  SLV_NS -.->|Run Checks| ASSERTS
+  SLV_P6 -.->|Run Checks| ASSERTS
+  SLV_AT -.->|Run Checks| ASSERTS
+
+  CRF -.->|Log Execution Metrics| AUDIT_TBL
+  DF -.->|Log Execution Metrics| AUDIT_TBL
+  SLV_NS -.->|Log Row Counts| AUDIT_TBL
+
+  style SEC fill:#f1f3f4,stroke:#5f6368,stroke-dasharray: 5 5
+  style SOURCES fill:#fff8e1,stroke:#f9ab00
+  style ENGINES fill:#e8f0fe,stroke:#1a73e8
+  style GCS_LAYER fill:#fce8e6,stroke:#ea4335
+  style BRONZE_BQ fill:#f1f3f4,stroke:#5f6368
+  style SILVER_DF fill:#e6f4ea,stroke:#1e8e3e
+            </pre>
+          </div>
+          <div class="diagram-caption">Figure 1: Full-scale Medallion Pipeline Architecture on Google Cloud Platform.</div>
+        </div>
+      </section>
+
+      <!-- Section 2: Engine Decision Matrix -->
+      <section class="card" id="engine-matrix">
+        <h2>
+          <span class="badge badge-green">Engine Matrix</span>
+          Dual Ingestion Engine Decision Tree &amp; Execution Flow
+        </h2>
+        <p>Configured dynamically per task via <code>engine.type: 'cloud_run_function' | 'dataflow'</code> in YAML metadata.</p>
+        
+        <div class="diagram-wrapper">
+          <div class="diagram-box" data-title="Dual Engine Decision Tree & Routing Flow">
+            <div class="zoom-badge">
+              🔍 Click to Zoom &amp; Pan (Full Screen HD)
+            </div>
+            <pre class="mermaid">
+flowchart TD
+  REQ["New Ingestion Request"] --> EVAL_VOL{"Estimated Row Count per Run"}
+  
+  EVAL_VOL -->|Less than 1M Rows| CHK_TIME{"Execution Time Under 9 Mins"}
+  EVAL_VOL -->|1M Rows or Greater| SELECT_DF["Route to Dataflow Flex Template<br/>Engine: dataflow"]
+  
+  CHK_TIME -->|Yes| SELECT_CRF["Route to Cloud Run Functions<br/>Engine: cloud_run_function"]
+  CHK_TIME -->|No| SELECT_DF
+
+  subgraph CRF_FLOW["Cloud Run Function Runtime"]
+    SELECT_CRF --> CRF_AUTH["1. Fetch Secret from Secret Manager"]
+    CRF_AUTH --> CRF_PAG["2. Stream Paginated API Records via RAM Generator"]
+    CRF_PAG --> CRF_PQ["3. Write Snappy PyArrow Parquet directly to GCS"]
+    CRF_PQ --> CRF_RET["4. Return HTTP 200 with record count and bytes written"]
+  end
+
+  subgraph DF_FLOW["Dataflow Apache Beam Runtime"]
+    SELECT_DF --> DF_SPAWN["1. Cloud Composer triggers DataflowLaunchFlexTemplateOperator"]
+    DF_SPAWN --> DF_POOL["2. Dataflow autoscales n1-standard-4 worker pool"]
+    DF_POOL --> DF_BEAM["3. Parallel PCollection partition and PyArrow write"]
+    DF_BEAM --> DF_GCS["4. High-throughput distributed Parquet shards landed in GCS"]
+  end
+
+  CRF_RET --> BQ_LOAD_STEP["Airflow triggers GCSToBigQueryOperator"]
+  DF_GCS --> BQ_LOAD_STEP
+
+  style EVAL_VOL fill:#fef7e0,stroke:#f9ab00
+  style CHK_TIME fill:#fef7e0,stroke:#f9ab00
+  style SELECT_CRF fill:#e8f0fe,stroke:#1a73e8
+  style SELECT_DF fill:#fce8e6,stroke:#ea4335
+  style CRF_FLOW fill:#f8f9fa,stroke:#1a73e8
+  style DF_FLOW fill:#f8f9fa,stroke:#ea4335
+            </pre>
+          </div>
+          <div class="diagram-caption">Figure 2: Runtime Engine Decision Tree and Execution Workflows.</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Evaluation Criteria</th>
+              <th>Cloud Run Functions</th>
+              <th>Dataflow (Apache Beam)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Target Volume</strong></td>
+              <td>Small to Medium (&lt; 1,000,000 rows)</td>
+              <td>High to Massive (&ge; 1,000,000 rows)</td>
+            </tr>
+            <tr>
+              <td><strong>Execution Window</strong></td>
+              <td>Short-lived (&le; 9 minutes max timeout)</td>
+              <td>Long-running multi-hour batch workflows</td>
+            </tr>
+            <tr>
+              <td><strong>Infrastructure Footprint</strong></td>
+              <td>Serverless, instant scale-to-zero, lowest cost</td>
+              <td>Managed worker pool in private VPC subnet</td>
+            </tr>
+            <tr>
+              <td><strong>Typical Workloads</strong></td>
+              <td>NetSuite Accounts/Vendors, P6 Projects/WBS, Atlas Surface Water &amp; Capable Faults</td>
+              <td>P6 Activity Spreads, Atlas Nationwide Population Grids, Full Historical Backfills</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Section 3: Adding New Tables (Interactive Tabs) -->
+      <section class="card" id="adding-tables">
+        <h2>
+          <span class="badge badge-blue">Developer Guide</span>
+          How to Add a New Ingestion Pipeline (Step-by-Step)
+        </h2>
+        <p>Follow the 4-step declarative workflow to onboard a new NetSuite, Primavera P6, or Elementl Atlas entity. Select a tab below to inspect the exact configuration files and extraction diagrams.</p>
+
+        <div class="tab-container">
+          <div class="tab-nav">
+            <button class="tab-btn active" onclick="openTab(event, 'tab-netsuite')">NetSuite Walkthrough</button>
+            <button class="tab-btn" onclick="openTab(event, 'tab-p6')">Primavera P6 Walkthrough</button>
+            <button class="tab-btn" onclick="openTab(event, 'tab-atlas')">Elementl Atlas (HTTP)</button>
+          </div>
+
+          <!-- Tab 1: NetSuite -->
+          <div id="tab-netsuite" class="tab-pane active">
+            <div class="diagram-wrapper">
+              <div class="diagram-box" data-title="NetSuite Ingestion Sequence & Data Flow">
+                <div class="zoom-badge">
+                  🔍 Click to Zoom &amp; Pan (Full Screen HD)
+                </div>
+                <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor Dev as Data Engineer
+  participant YAML as config/sources/netsuite/
+  participant Schema as config/schemas/netsuite/
+  participant Gen as dag_generator.py
+  participant Airflow as Cloud Composer DAG
+  participant CRF as Cloud Run Function
+  participant NS as NetSuite SuiteQL API
+  participant GCS as GCS Landing Bucket
+  participant BQ as BigQuery Raw
+  participant DF as Dataform Silver
+
+  Dev->>Schema: 1. Create netsuite_invoices_schema.json
+  Dev->>YAML: 2. Create netsuite_invoices.yaml
+  Dev->>Gen: 3. Run dag_generator.py --tasks netsuite_invoices
+  Gen->>Airflow: 4. Emits dag_ingest_netsuite_invoices.py
+  Airflow->>CRF: 5. Trigger invoke_cloud_run_extractor
+  CRF->>NS: 6. Request SuiteQL with HMAC-SHA256 TBA Auth and Pagination
+  NS-->>CRF: 7. Stream JSON Records
+  CRF->>GCS: 8. Write Snappy Parquet to gs://landing-bucket/netsuite/invoices/
+  CRF-->>Airflow: 9. HTTP 200 Success and Metrics
+  Airflow->>BQ: 10. Run GCSToBigQueryOperator
+  Airflow->>DF: 11. Trigger Dataform Silver Workflow
+                </pre>
+              </div>
+              <div class="diagram-caption">Figure 3: NetSuite End-to-End Ingestion Sequence Diagram.</div>
+            </div>
+
+            <div class="step-list">
+              <div class="step-item">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <div class="step-title">Create Target BigQuery Schema JSON</div>
+                  <p>Define the strongly typed raw schema under <code>config/schemas/netsuite/netsuite_invoices_schema.json</code>.</p>
+                  <pre><code>[
+  {"name": "invoice_id", "type": "INTEGER", "mode": "REQUIRED"},
+  {"name": "invoice_number", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "amount", "type": "NUMERIC", "mode": "NULLABLE"},
+  {"name": "customer_id", "type": "INTEGER", "mode": "NULLABLE"},
+  {"name": "last_modified_date", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "ingestion_date", "type": "DATE", "mode": "REQUIRED"},
+  {"name": "ingestion_timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]</code></pre>
+                </div>
+              </div>
+
+              <div class="step-item">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <div class="step-title">Define Ingestion Metadata YAML</div>
+                  <p>Create <code>config/sources/netsuite/netsuite_invoices.yaml</code> with SuiteQL query &amp; schedule.</p>
+                  <pre><code>task_id: netsuite_invoices
+source:
+  type: netsuite
+  connection_secret_id: "{{ var.json.common_variables.secrets.netsuite_secret_id }}"
+  load_type: incremental
+  watermark_column: lastmodifieddate
+  query: |
+    SELECT id AS invoice_id, tranid AS invoice_number, total AS amount, entity AS customer_id, lastmodifieddate AS last_modified_date
+    FROM transaction WHERE type = 'CustInvc' AND lastmodifieddate >= '{{ prev_execution_date | ds }}'
+engine:
+  type: cloud_run_function
+  function_url: "{{ var.json.common_variables.cloud_run_function_url }}"
+destination:
+  format: PARQUET
+  gcs_bucket: "{{ var.json.common_variables.landing_bucket }}"
+  gcs_prefix: "netsuite/invoices/"
+  bq_dataset: "{{ var.json.common_variables.landing_dataset_netsuite }}"
+  bq_table: invoices
+  schema_file: config/schemas/netsuite/netsuite_invoices_schema.json
+  write_disposition: WRITE_APPEND
+orchestration:
+  dag_id: dag_ingest_netsuite_invoices
+  schedule_interval: "0 3 * * *"</code></pre>
+                </div>
+              </div>
+
+              <div class="step-item">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <div class="step-title">Declare in Dataform &amp; Write Silver SQLX Transformation</div>
+                  <p>Add source in <code>dataform/definitions/sources/declarations.js</code> and create <code>dataform/definitions/silver/netsuite/silver_netsuite_invoices.sqlx</code>.</p>
+                  <pre><code>config {
+  type: "incremental",
+  schema: "silver_netsuite",
+  name: "fct_invoices",
+  bigquery: { partitionBy: "DATE(ingestion_timestamp)", clusterBy: ["invoice_id", "customer_id"] },
+  assertions: { uniqueKey: ["invoice_id"], nonNull: ["invoice_id"] }
+}
+
+SELECT
+  SAFE_CAST(invoice_id AS INT64) AS invoice_id,
+  NULLIF(TRIM(invoice_number), '') AS invoice_number,
+  COALESCE(SAFE_CAST(amount AS NUMERIC), 0) AS amount,
+  SAFE_CAST(customer_id AS INT64) AS customer_id,
+  SAFE_CAST(last_modified_date AS TIMESTAMP) AS last_modified_date,
+  CURRENT_TIMESTAMP() AS silver_updated_at
+FROM ${ref("invoices")}
+QUALIFY ROW_NUMBER() OVER(PARTITION BY invoice_id ORDER BY last_modified_date DESC) = 1</code></pre>
+                </div>
+              </div>
+
+              <div class="step-item">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                  <div class="step-title">Compile DAG &amp; Verify</div>
+                  <p>Run the generator to create the dedicated Composer DAG:</p>
+                  <pre><code>.venv/bin/python composer/dag_factory/dag_generator.py --tasks netsuite_invoices</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Primavera P6 -->
+          <div id="tab-p6" class="tab-pane">
+            <div class="diagram-wrapper">
+              <div class="diagram-box" data-title="Primavera P6 Ingestion Sequence & Dataflow Pipeline">
+                <div class="zoom-badge">
+                  🔍 Click to Zoom &amp; Pan (Full Screen HD)
+                </div>
+                <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor Dev as Data Engineer
+  participant YAML as config/sources/p6/
+  participant Schema as config/schemas/p6/
+  participant Gen as dag_generator.py
+  participant Airflow as Cloud Composer DAG
+  participant DF_Job as Dataflow Service
+  participant P6 as Primavera P6 Database (JDBC)
+  participant GCS as GCS Landing Bucket
+  participant BQ as BigQuery Raw
+  participant Dataform as Dataform Silver
+
+  Dev->>Schema: 1. Create p6_activities_schema.json
+  Dev->>YAML: 2. Create p6_activities.yaml
+  Dev->>Gen: 3. Run dag_generator.py --tasks p6_activities
+  Gen->>Airflow: 4. Emits dag_ingest_p6_activities.py
+  Airflow->>DF_Job: 5. Launch DataflowLaunchFlexTemplateOperator
+  DF_Job->>P6: 6. Scaled parallel JDBC workers query TASK table
+  P6-->>DF_Job: 7. High-volume database rows
+  DF_Job->>GCS: 8. Write Parquet shards to gs://landing-bucket/p6/activities/
+  DF_Job-->>Airflow: 9. Batch complete notification
+  Airflow->>BQ: 10. Load Parquet into raw_p6.activities
+  Airflow->>Dataform: 11. Execute silver_p6_activities.sqlx
+                </pre>
+              </div>
+              <div class="diagram-caption">Figure 4: Primavera P6 High-Volume Dataflow Ingestion Flow.</div>
+            </div>
+
+            <div class="step-list">
+              <div class="step-item">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <div class="step-title">Create Target BigQuery Schema JSON</div>
+                  <p>Define schema under <code>config/schemas/p6/p6_activities_schema.json</code>.</p>
+                  <pre><code>[
+  {"name": "object_id", "type": "INTEGER", "mode": "REQUIRED"},
+  {"name": "activity_id", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "percent_complete", "type": "FLOAT", "mode": "NULLABLE"},
+  {"name": "early_start_date", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "early_finish_date", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "ingestion_date", "type": "DATE", "mode": "REQUIRED"},
+  {"name": "ingestion_timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]</code></pre>
+                </div>
+              </div>
+
+              <div class="step-item">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <div class="step-title">Define Ingestion Metadata YAML (Dataflow Engine / JDBC)</div>
+                  <p>Create <code>config/sources/p6/p6_activities.yaml</code> targeting the Dataflow Flex Template over JDBC.</p>
+                  <pre><code>task_id: p6_activities
+source:
+  type: p6
+  connection_type: jdbc
+  connection_secret_id: "{{ var.json.common_variables.secrets.p6_secret_id }}"
+  driver_class: oracle.jdbc.OracleDriver
+  fetch_size: 5000
+  load_type: incremental
+  watermark_column: update_date
+  query: |
+    SELECT task_id AS object_id, task_code AS activity_id, ...
+    FROM TASK WHERE update_date >= '{{ prev_execution_date | ds }}'
+engine:
+  type: dataflow
+  container_spec_path: "{{ var.json.common_variables.dataflow.container_spec_path_p6_to_gcs }}"
+  parameters:
+    driver_class_name: oracle.jdbc.OracleDriver
+    fetch_size: 5000
+destination:
+  format: PARQUET
+  gcs_bucket: "{{ var.json.common_variables.landing_bucket }}"
+  gcs_prefix: "p6/activities/ingestion_date={{ data_interval_end | ds }}/"
+  bq_dataset: "{{ var.json.common_variables.landing_dataset_p6 }}"
+  bq_table: activities
+  schema_file: config/schemas/p6/p6_activities_schema.json
+orchestration:
+  dag_id: dag_ingest_p6_activities
+  schedule_interval: "30 1 * * *"</code></pre>
+                </div>
+              </div>
+
+              <div class="step-item">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <div class="step-title">Create Silver Dataform Model with Date Sanitization</div>
+                  <p>In <code>dataform/definitions/silver/p6/silver_p6_activities.sqlx</code>, normalize fields and assert valid schedule timelines.</p>
+                </div>
+              </div>
+
+              <div class="step-item">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                  <div class="step-title">Generate DAG</div>
+                  <pre><code>.venv/bin/python composer/dag_factory/dag_generator.py --tasks p6_activities</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 3: Elementl Atlas (HTTP Siting & Geospatial APIs) -->
+          <div id="tab-atlas" class="tab-pane">
+            <div class="callout callout-info">
+              <div>
+                <strong>Elementl Atlas System:</strong> Atlas is the proprietary nuclear and clean energy site selection &amp; environmental intelligence platform built by Elementl. All interactions with Atlas are conducted over standard <strong>HTTP REST</strong> and <strong>ArcGIS GeoServices APIs</strong>.
+              </div>
+            </div>
+
+            <!-- Slide Data Sources Matrix -->
+            <div style="margin: 18px 0;">
+              <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 10px; color: var(--gcp-grey-900);">
+                📊 Elementl Atlas Siting Data Sources Matrix (Design Specification)
+              </h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data Category</th>
+                    <th>Total Count (144)</th>
+                    <th>Tier-1 Count (18)</th>
+                    <th>Criteria ID</th>
+                    <th>Criteria Name</th>
+                    <th>Ingestion Method</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>ArcGIS REST feature service</strong></td>
+                    <td>63</td>
+                    <td>10</td>
+                    <td><code>S1-02</code></td>
+                    <td>Capable faults (buffer)</td>
+                    <td><span class="badge badge-blue">Cloud Run Function (HTTP GET)</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Bulk file download</strong></td>
+                    <td>23</td>
+                    <td>5</td>
+                    <td><code>S1-01</code></td>
+                    <td>Population density</td>
+                    <td><span class="badge badge-blue">Cloud Run Function (HTTP Stream)</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Tabular data API</strong></td>
+                    <td>24</td>
+                    <td>1</td>
+                    <td><code>S2-20</code></td>
+                    <td>Surface water availability (flowing)</td>
+                    <td><span class="badge badge-green">Dataflow / Cloud Run (HTTP REST)</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Scrape or agent-fetch</strong></td>
+                    <td>17</td>
+                    <td>1</td>
+                    <td><em>Not Covered</em></td>
+                    <td><em>Regulatory filings &amp; permits</em></td>
+                    <td><span class="badge badge-yellow">Agent Staging (Planned)</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>SME / manual</strong></td>
+                    <td>17</td>
+                    <td>1</td>
+                    <td><em>Not Covered</em></td>
+                    <td><em>Geological field studies</em></td>
+                    <td><span class="badge badge-yellow">GCS Manual Dropzone (Planned)</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="diagram-wrapper">
+              <div class="diagram-box" data-title="Elementl Atlas HTTP Siting Ingestion Pipeline">
+                <div class="zoom-badge">
+                  🔍 Click to Zoom &amp; Pan (Full Screen HD)
+                </div>
+                <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor Dev as Siting Engineer
+  participant YAML as config/sources/atlas/
+  participant Airflow as Cloud Composer DAG
+  participant CRF as Cloud Run Function
+  participant Atlas as Elementl Atlas API (HTTP)
+  participant GCS as GCS Landing Bucket
+  participant BQ as BigQuery Raw
+  participant DF as Dataform Silver
+
+  Dev->>YAML: 1. Define atlas_capable_faults.yaml (Criteria S1-02)
+  Airflow->>CRF: 2. Trigger invoke_cloud_run_extractor
+  CRF->>Atlas: 3. HTTP GET /arcgis/rest/.../FeatureServer/0/query with API Key
+  Atlas-->>CRF: 4. Stream GeoJSON Features and Attributes
+  CRF->>GCS: 5. Write Snappy Parquet to gs://landing-bucket/atlas/capable_faults/
+  CRF-->>Airflow: 6. HTTP 200 Success and record counts
+  Airflow->>BQ: 7. Run GCSToBigQueryOperator (ALLOW_FIELD_ADDITION)
+  Airflow->>DF: 8. Trigger Dataform Silver (silver_atlas_capable_faults.sqlx)
+  DF-->>BQ: 9. Conforms Exclusionary Buffers and Asserts Zero-Overlap
+                </pre>
+              </div>
+              <div class="diagram-caption">Figure 5: Elementl Atlas HTTP Siting &amp; Geospatial Ingestion Sequence.</div>
+            </div>
+
+            <div class="step-list">
+              <div class="step-item">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <div class="step-title">Define BigQuery Schema JSON</div>
+                  <p>Define strongly-typed geological/demographic schema in <code>config/schemas/atlas/atlas_capable_faults_schema.json</code>.</p>
+                  <pre><code>[
+  {"name": "fault_id", "type": "INTEGER", "mode": "REQUIRED"},
+  {"name": "fault_name", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "slip_rate_mm_yr", "type": "FLOAT", "mode": "NULLABLE"},
+  {"name": "activity_class", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "buffer_distance_km", "type": "FLOAT", "mode": "NULLABLE"},
+  {"name": "fault_geometry_geojson", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "last_updated", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "ingestion_date", "type": "DATE", "mode": "REQUIRED"},
+  {"name": "ingestion_timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]</code></pre>
+                </div>
+              </div>
+
+              <div class="step-item">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <div class="step-title">Configure Ingestion YAML (HTTP REST / ArcGIS)</div>
+                  <p>In <code>config/sources/atlas/atlas_capable_faults.yaml</code>, configure HTTP connection, endpoint, and criteria:</p>
+                  <pre><code>task_id: atlas_capable_faults
+description: Ingests geological fault lines from Elementl Atlas ArcGIS REST (Criteria S1-02).
+source:
+  type: atlas
+  data_category: arcgis_rest
+  criteria_id: S1-02
+  criteria_name: "Capable faults (buffer)"
+  connection_type: http
+  connection_secret_id: "{{ var.json.common_variables.secrets.atlas_secret_id }}"
+  endpoint: "/arcgis/rest/services/siting/geological_hazards/FeatureServer/0/query"
+  load_type: full_refresh
+engine:
+  type: cloud_run_function
+  function_url: "{{ var.json.common_variables.cloud_run_function_url }}"
+destination:
+  format: PARQUET
+  gcs_bucket: "{{ var.json.common_variables.landing_bucket }}"
+  gcs_prefix: "atlas/capable_faults/ingestion_date={{ data_interval_end | ds }}/"
+  bq_dataset: "{{ var.json.common_variables.landing_dataset_atlas }}"
+  bq_table: capable_faults
+  schema_file: config/schemas/atlas/atlas_capable_faults_schema.json
+  write_disposition: WRITE_TRUNCATE
+orchestration:
+  dag_id: dag_ingest_atlas_capable_faults
+  schedule_interval: "0 4 * * 0"</code></pre>
+                </div>
+              </div>
+
+              <div class="step-item">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <div class="step-title">Dataform Silver Model with Exclusionary Buffering</div>
+                  <p>In <code>dataform/definitions/silver/atlas/silver_atlas_capable_faults.sqlx</code>, calculate regulatory exclusion zones and deduplicate:</p>
+                  <pre><code>config {
+  type: "table",
+  schema: "silver_atlas",
+  name: "fct_capable_faults",
+  assertions: { uniqueKey: ["fault_id"], nonNull: ["fault_id", "buffer_distance_km"] }
+}
+
+SELECT
+  SAFE_CAST(fault_id AS INT64) AS fault_id,
+  COALESCE(TRIM(fault_name), 'Unknown Fault') AS fault_name,
+  SAFE_CAST(buffer_distance_km AS FLOAT64) AS buffer_distance_km,
+  CASE
+    WHEN SAFE_CAST(buffer_distance_km AS FLOAT64) >= 8.0 THEN 'STRICT_EXCLUSION'
+    WHEN SAFE_CAST(buffer_distance_km AS FLOAT64) >= 5.0 THEN 'BUFFERED_ANALYSIS_REQUIRED'
+    ELSE 'MONITORING_ONLY'
+  END AS exclusionary_tier,
+  CURRENT_TIMESTAMP() AS silver_updated_at
+FROM ${ref("capable_faults")}
+QUALIFY ROW_NUMBER() OVER(PARTITION BY fault_id ORDER BY last_updated DESC) = 1</code></pre>
+                </div>
+              </div>
+
+              <div class="step-item">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                  <div class="step-title">Compile DAG</div>
+                  <pre><code>.venv/bin/python composer/dag_factory/dag_generator.py --tasks atlas_capable_faults</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4: DAG Lifecycle & Reflection Flow -->
+      <section class="card" id="dag-lifecycle">
+        <h2>
+          <span class="badge badge-yellow">DAG Factory</span>
+          How Generator Code Changes are Reflected on DAGs
+        </h2>
+        <p>Understanding how edits to metadata YAMLs, Jinja templates, or generator code propagate to Cloud Composer automatically. <strong>(Click diagram to zoom)</strong></p>
+
+        <div class="diagram-wrapper">
+          <div class="diagram-box" data-title="DAG Code Reflection & CI/CD Lifecycle Flow">
+            <div class="zoom-badge">
+              🔍 Click to Zoom &amp; Pan (Full Screen HD)
+            </div>
+            <pre class="mermaid">
+flowchart TD
+  subgraph DEV["1. Local Development and PR Workflow"]
+    DEV_EDIT["Developer edits YAML Config / Jinja Template / Python Extractor"]
+    LOCAL_TEST["Run Pytest Unit Suite and Dataform Compilation<br/>pytest tests/ and npx dataform compile"]
+    LOCAL_GEN["Run dag_generator.py to update local composer/dags/"]
+    DEV_EDIT --> LOCAL_TEST
+    LOCAL_TEST --> LOCAL_GEN
+  end
+
+  subgraph CICD["2. Automated CI/CD Pipeline (Cloud Build / GitHub Actions)"]
+    GIT_PUSH["Git Push / Merge to main branch"]
+    CI_LINT["Validate Metadata Schema and Airflow DAG syntax"]
+    CI_DEPLOY["Sync dags/, config/, and plugins/ to Cloud Composer GCS Bucket"]
+    LOCAL_GEN --> GIT_PUSH
+    GIT_PUSH --> CI_LINT
+    CI_LINT --> CI_DEPLOY
+  end
+
+  subgraph AIRFLOW_ENV["3. Cloud Composer Environment (Self-Healing Runtime)"]
+    GCS_DAGS[("Composer DAGs GCS Bucket")]
+    MASTER_DAG["dag_framework_dag_generator<br/>(Master Self-Healing DAG runs on schedule or trigger)"]
+    TASK_DAGS["Standalone Ingestion DAGs<br/>dag_ingest_netsuite.py<br/>dag_ingest_p6.py<br/>dag_ingest_atlas.py"]
+    SCHEDULER["Airflow DagFileProcessor / Scheduler"]
+
+    CI_DEPLOY --> GCS_DAGS
+    GCS_DAGS --> MASTER_DAG
+    MASTER_DAG -->|Dynamically Re-renders and Validates| TASK_DAGS
+    TASK_DAGS --> SCHEDULER
+    SCHEDULER -->|Discovers new/modified DAGs instantly| EXEC["Airflow Task Execution Engine"]
+  end
+
+  style DEV fill:#f8f9fa,stroke:#1a73e8
+  style CICD fill:#fff8e1,stroke:#f9ab00
+  style AIRFLOW_ENV fill:#e6f4ea,stroke:#1e8e3e
+            </pre>
+          </div>
+          <div class="diagram-caption">Figure 6: DAG Factory Automated CI/CD &amp; Code Reflection Architecture.</div>
+        </div>
+
+        <div class="callout callout-info">
+          <div>
+            <strong>Reflection Mechanism:</strong>
+            When template changes (e.g. <code>composer/dag_factory/templates/includes/*.jinja</code>) or metadata parameters are modified, running <code>dag_generator.py</code> re-renders every <code>composer/dags/dag_ingest_*.py</code> file idempotently.
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5: Standard DAG TaskGroup Execution Trace -->
+      <section class="card" id="task-trace">
+        <h2>
+          <span class="badge badge-blue">Task Lifecycle</span>
+          Airflow TaskGroup Execution Trace &amp; State Machine
+        </h2>
+        <p>Every compiled DAG follows a standardized, fault-tolerant execution graph with transactional idempotency. <strong>(Click diagram to zoom)</strong></p>
+
+        <div class="diagram-wrapper">
+          <div class="diagram-box" data-title="Airflow TaskGroup Execution Trace & State Machine">
+            <div class="zoom-badge">
+              🔍 Click to Zoom &amp; Pan (Full Screen HD)
+            </div>
+            <pre class="mermaid">
+flowchart TD
+  START(["Start Task"]) --> T1["1. invoke_cloud_run_extractor / launch_dataflow<br/>Streams source data to GCS Parquet"]
+  
+  T1 --> CHK_LOAD{"Load Type"}
+  CHK_LOAD -->|Incremental| T2["2. purge_landing_partition<br/>DELETE WHERE ingestion_date = execution_date"]
+  CHK_LOAD -->|Full Overwrite| T3["3. load_gcs_to_bigquery<br/>Loads Parquet into BigQuery Raw with WRITE_TRUNCATE"]
+  
+  T2 --> T3_INC["3. load_gcs_to_bigquery<br/>Loads Parquet into BigQuery Raw with WRITE_APPEND"]
+  
+  T3 --> T4["4. trigger_dataform_silver<br/>Dataform executes Silver SQLX transformation"]
+  T3_INC --> T4
+  
+  T4 --> T5["5. record_audit_log<br/>Inserts row count, bytes and duration into audit table"]
+  T5 --> END_TASK(["End Task"])
+
+  style START fill:#f1f3f4,stroke:#5f6368
+  style T1 fill:#e8f0fe,stroke:#1a73e8
+  style CHK_LOAD fill:#fef7e0,stroke:#f9ab00
+  style T2 fill:#fce8e6,stroke:#ea4335
+  style T3 fill:#e6f4ea,stroke:#1e8e3e
+  style T3_INC fill:#e6f4ea,stroke:#1e8e3e
+  style T4 fill:#fef7e0,stroke:#f9ab00
+  style T5 fill:#e8f0fe,stroke:#1a73e8
+  style END_TASK fill:#f1f3f4,stroke:#5f6368
+            </pre>
+          </div>
+          <div class="diagram-caption">Figure 7: Standard Airflow TaskGroup Execution Graph with Partition Pruning.</div>
+        </div>
+      </section>
+
+      <!-- Section 6: Dataform Raw -> Silver -->
+      <section class="card" id="dataform">
+        <h2>
+          <span class="badge badge-green">Dataform</span>
+          Silver Conformed Layer &amp; Data Autocleaning
+        </h2>
+        <p>Dataform transforms raw landing tables into analytics-ready Silver models applying the following non-negotiable enterprise rules. <strong>(Click diagram to zoom)</strong></p>
+
+        <div class="diagram-wrapper">
+          <div class="diagram-box" data-title="Dataform Raw to Silver Autocleaning & Quality Assertion Engine">
+            <div class="zoom-badge">
+              🔍 Click to Zoom &amp; Pan (Full Screen HD)
+            </div>
+            <pre class="mermaid">
+flowchart TD
+  RAW[("BigQuery Bronze Raw Landing Table<br/>e.g. raw_netsuite.transactions")] --> STG["Dataform SQLX Staging / CTE Processing"]
+  
+  subgraph CLEAN["Dataform Autocleaning Transformations"]
+    STG --> QUAL["1. Windowed Deduplication<br/>QUALIFY ROW_NUMBER OVER PARTITION BY pk ORDER BY updated_at DESC = 1"]
+    QUAL --> CAST["2. Safe Type Casting and Null Sanitization<br/>SAFE_CAST, NULLIF, COALESCE, TRIM"]
+    CAST --> ENRICH["3. Business Column Mapping and Timestamp Normalization<br/>silver_updated_at = CURRENT_TIMESTAMP"]
+  end
+
+  ENRICH --> SILVER[("BigQuery Silver Conformed Model<br/>e.g. silver_netsuite.fct_transactions")]
+  
+  subgraph QUALITY["Automated Data Quality Assertions"]
+    SILVER --> A1["Unique Primary Key Assertion"]
+    SILVER --> A2["Non-Null Foreign Key Assertion"]
+    SILVER --> A3["Business Logic Range Validation<br/>finish_date after start_date"]
+  end
+
+  A1 --> PASS{"All Assertions Pass"}
+  A2 --> PASS
+  A3 --> PASS
+
+  PASS -->|Yes| READY(["Silver Table Certified for Analytics"])
+  PASS -->|No| ALERT(["Quarantine Violations and Alert Data Team"])
+
+  style RAW fill:#f1f3f4,stroke:#5f6368
+  style CLEAN fill:#e8f0fe,stroke:#1a73e8
+  style SILVER fill:#e6f4ea,stroke:#1e8e3e
+  style QUALITY fill:#fff8e1,stroke:#f9ab00
+  style READY fill:#e6f4ea,stroke:#1e8e3e
+  style ALERT fill:#fce8e6,stroke:#ea4335
+            </pre>
+          </div>
+          <div class="diagram-caption">Figure 8: Dataform Silver Pipeline Transformation and Data Quality Enforcement.</div>
+        </div>
+
+        <div class="step-list">
+          <div class="step-item">
+            <div class="step-number">A</div>
+            <div class="step-content">
+              <div class="step-title">Windowed Deduplication (QUALIFY Clause)</div>
+              <p>Ensures exactly-once semantics even if upstream sources retransmit records:</p>
+              <pre><code>QUALIFY ROW_NUMBER() OVER(
+  PARTITION BY primary_key
+  ORDER BY SAFE_CAST(last_modified_date AS TIMESTAMP) DESC,
+           SAFE_CAST(ingestion_timestamp AS TIMESTAMP) DESC
+) = 1</code></pre>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">B</div>
+            <div class="step-content">
+              <div class="step-title">Safe Casting &amp; Null Sanitization</div>
+              <p>Prevents query failures caused by corrupted strings in numeric/date columns:</p>
+              <pre><code>NULLIF(TRIM(string_col), '') AS string_col,
+COALESCE(SAFE_CAST(amount AS NUMERIC), 0) AS amount,
+SAFE_CAST(transaction_date AS DATE) AS transaction_date</code></pre>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">C</div>
+            <div class="step-content">
+              <div class="step-title">Data Quality Assertions</div>
+              <p>Automated data checks executed during Dataform compilation (e.g. <code>assert_p6_activities_dates_valid.sqlx</code>):</p>
+              <pre><code>SELECT object_id, early_start_date, early_finish_date
+FROM ${ref("fct_activities")}
+WHERE early_finish_date &lt; early_start_date</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 7: Schema Evolution Engine (NetSuite & Primavera P6) -->
+      <section class="card" id="schema-evolution">
+        <h2>
+          <span class="badge badge-yellow">Schema Governance</span>
+          Automated Schema Evolution Engine (NetSuite &amp; Primavera P6)
+        </h2>
+        <p>Enterprise ERP (NetSuite) and Project Portfolio Management (Oracle Primavera P6) systems evolve constantly as businesses introduce new attributes, custom fields, and regulatory tracking columns. The Elementl framework provides a <strong>zero-downtime, fully automated schema evolution pipeline</strong> engineered specifically for NetSuite and P6 sources. <strong>(Click diagram to zoom)</strong></p>
+
+        <div class="diagram-wrapper">
+          <div class="diagram-box" data-title="Automated Schema Evolution Architecture for NetSuite & Primavera P6">
+            <div class="zoom-badge">
+              🔍 Click to Zoom &amp; Pan (Full Screen HD)
+            </div>
+            <pre class="mermaid">
+flowchart TD
+  subgraph S1["1. Upstream Schema Evolution Event"]
+    NS_CHG["NetSuite ERP: Business adds Custom Field<br/>e.g. custbody_delivery_terms or custcol_tax_tier"]
+    P6_CHG["Primavera P6 DB: Engineering adds UDF<br/>e.g. udf_environmental_risk_score in TASK table"]
+  end
+
+  subgraph S2["2. Declarative Contract &amp; Query Projection"]
+    YAML_PROJ["Update YAML Source Query<br/>Project new column in SuiteQL or Oracle JDBC SELECT"]
+    JSON_DECL["Update BigQuery JSON Schema<br/>Declare new field with mode: NULLABLE"]
+    YAML_PROJ --> JSON_DECL
+  end
+
+  subgraph S3["3. Self-Describing Bronze Ingestion"]
+    PQ_WRITE["Cloud Run / Dataflow Extractor<br/>Streams Snappy Parquet with embedded schema to GCS"]
+  end
+
+  subgraph S4["4. BigQuery Raw Landing Auto-Evolution"]
+    BQ_JOB["BigQuery Batch Load Job<br/>schemaUpdateOptions: ALLOW_FIELD_ADDITION, ALLOW_FIELD_RELAXATION"]
+    BQ_EVOL["BigQuery Raw Table Updated Automatically<br/>Historical partitions read NULL; New partitions populate values"]
+    BQ_JOB --> BQ_EVOL
+  end
+
+  subgraph S5["5. Dataform Silver Conformed Layer Adaptation"]
+    DF_CLEAN["Dataform Silver SQLX Model<br/>SAFE_CAST, NULLIF &amp; COALESCE protect downstream analytics"]
+    DF_TEST["Dataform Quality Assertions<br/>Continuous contract validation across historical &amp; new rows"]
+    DF_CLEAN --> DF_TEST
+  end
+
+  NS_CHG --> YAML_PROJ
+  P6_CHG --> YAML_PROJ
+  JSON_DECL --> PQ_WRITE
+  PQ_WRITE --> BQ_JOB
+  BQ_EVOL --> DF_CLEAN
+
+  style S1 fill:#fff8e1,stroke:#f9ab00
+  style S2 fill:#e8f0fe,stroke:#1a73e8
+  style S3 fill:#fce8e6,stroke:#ea4335
+  style S4 fill:#f1f3f4,stroke:#5f6368
+  style S5 fill:#e6f4ea,stroke:#1e8e3e
+            </pre>
+          </div>
+          <div class="diagram-caption">Figure 9: Automated Schema Evolution Pipeline Architecture for NetSuite and Primavera P6.</div>
+        </div>
+
+        <div style="margin: 24px 0;">
+          <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--gcp-grey-900); margin-bottom: 12px;">
+            Core Schema Evolution Mechanics (NetSuite &amp; P6)
+          </h3>
+          <p>The framework avoids brittle hardcoded ETL pipelines by employing four layered resilience mechanisms:</p>
+        </div>
+
+        <div class="step-list">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">BigQuery Dynamic Field Addition (ALLOW_FIELD_ADDITION)</div>
+              <p>Every BigQuery batch load task generated by the DAG factory specifies automated schema evolution flags:</p>
+              <pre><code>"schemaUpdateOptions": [
+  "ALLOW_FIELD_ADDITION",
+  "ALLOW_FIELD_RELAXATION"
+]</code></pre>
+              <p>When new columns appear in GCS Parquet files, BigQuery <strong>automatically updates the table definition on the fly</strong> without table locks, DDL migrations, or ingestion halts. Existing historical partitions seamlessly return <code>NULL</code> for the new column.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Self-Describing Parquet Metadata on GCS</div>
+              <p>Extracted datasets are serialized with PyArrow using the Snappy-compressed Apache Parquet specification. Each Parquet file carries its own embedded schema metadata in the file footer. When a NetSuite SuiteQL query or P6 JDBC extraction projects additional fields, incoming Parquet files include the new column definitions without corrupting previous partitions.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Dataform Silver Resilience (Defensive SQLX Casting)</div>
+              <p>Downstream Silver models isolate BI and reporting from schema drift through defensive projection techniques:</p>
+              <pre><code>SELECT
+  transaction_id,
+  -- Safe casting prevents type widening crashes
+  SAFE_CAST(custbody_delivery_terms AS STRING) AS delivery_terms,
+  -- COALESCE guarantees sensible defaults for historical rows
+  COALESCE(SAFE_CAST(udf_environmental_score AS FLOAT64), 0.0) AS environmental_score
+FROM ${ref("transactions")}</code></pre>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <div class="step-title">Automated CI/CD Validation &amp; Protection Guardrails</div>
+              <p>The framework's pre-commit validation suite (<code>composer/dag_factory/validator.py</code>) ensures that schema changes do not violate backward compatibility rules:</p>
+              <ul>
+                <li>✅ <strong>Permitted:</strong> Adding new fields as <code>NULLABLE</code> mode.</li>
+                <li>✅ <strong>Permitted:</strong> Relaxing <code>REQUIRED</code> constraints to <code>NULLABLE</code>.</li>
+                <li>✅ <strong>Permitted:</strong> Widening numeric columns (e.g. <code>INTEGER</code> &rarr; <code>FLOAT</code> / <code>NUMERIC</code>).</li>
+                <li>❌ <strong>Blocked:</strong> Removing or renaming primary key deduplication fields without an active deprecation cycle.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schema Evolution Support Matrix Table -->
+        <div style="margin: 24px 0;">
+          <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--gcp-grey-900); margin-bottom: 12px;">
+            📋 Schema Evolution Compatibility Matrix (NetSuite &amp; Primavera P6)
+          </h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Evolution Scenario</th>
+                <th>NetSuite ERP Trigger</th>
+                <th>Primavera P6 Trigger</th>
+                <th>Framework Automated Action</th>
+                <th>Compatibility Impact</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Add New Field</strong></td>
+                <td>Admin adds <code>custbody_*</code> custom field to transactions</td>
+                <td>Controls team adds <code>UDF_*</code> field to <code>TASK</code> table</td>
+                <td>Project in YAML; BigQuery adds column via <code>ALLOW_FIELD_ADDITION</code></td>
+                <td><span class="badge badge-green">Non-Breaking</span></td>
+              </tr>
+              <tr>
+                <td><strong>Relax Nullability</strong></td>
+                <td>Field made optional in NetSuite form layout</td>
+                <td><code>NOT NULL</code> constraint relaxed in Oracle database</td>
+                <td>BigQuery relaxes mode via <code>ALLOW_FIELD_RELAXATION</code></td>
+                <td><span class="badge badge-green">Non-Breaking</span></td>
+              </tr>
+              <tr>
+                <td><strong>Numeric Widening</strong></td>
+                <td>Invoice amounts exceed 32-bit integer capacity</td>
+                <td>Activity duration expanded to high-precision float</td>
+                <td>Dataform Silver models apply <code>SAFE_CAST(... AS NUMERIC)</code></td>
+                <td><span class="badge badge-green">Non-Breaking</span></td>
+              </tr>
+              <tr>
+                <td><strong>Column Renaming</strong></td>
+                <td>SuiteQL query alias updated</td>
+                <td>Oracle DB column renamed in P6 schema</td>
+                <td>Treated as new column addition; legacy column persists as null</td>
+                <td><span class="badge badge-yellow">Deprecation Notice</span></td>
+              </tr>
+              <tr>
+                <td><strong>Drop Primary Key</strong></td>
+                <td>Primary key field removed from query</td>
+                <td>Primary key dropped from table projection</td>
+                <td>Blocked by Dataform assertions (<code>uniqueKey</code> and <code>nonNull</code>)</td>
+                <td><span class="badge badge-red">Breaking (Rejected)</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Step-by-Step Evolution Walkthrough -->
+        <div style="margin: 24px 0;">
+          <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--gcp-grey-900); margin-bottom: 12px;">
+            🛠️ Step-by-Step Walkthrough: Adding a Column to NetSuite / P6
+          </h3>
+          <p>When an engineer needs to onboard a new field (e.g. <code>custbody_delivery_terms</code> in NetSuite or <code>udf_environmental_score</code> in P6 Activities):</p>
+          <div class="step-list">
+            <div class="step-item">
+              <div class="step-number">A</div>
+              <div class="step-content">
+                <div class="step-title">1. Update BigQuery Schema JSON</div>
+                <p>Append the new field with <code>"mode": "NULLABLE"</code> in <code>config/schemas/{source}/{task}_schema.json</code>:</p>
+                <pre><code>{"name": "custbody_delivery_terms", "type": "STRING", "mode": "NULLABLE"}</code></pre>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-number">B</div>
+              <div class="step-content">
+                <div class="step-title">2. Update Metadata YAML Query</div>
+                <p>Add the field to the <code>query</code> block in <code>config/sources/{source}/{task}.yaml</code>:</p>
+                <pre><code>SELECT id, tranid, total, custbody_delivery_terms FROM transaction ...</code></pre>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-number">C</div>
+              <div class="step-content">
+                <div class="step-title">3. Regenerate DAG &amp; Update Dataform Silver Model</div>
+                <p>Run the generator and add the field into your SQLX transformation:</p>
+                <pre><code>.venv/bin/python composer/dag_factory/dag_generator.py --tasks netsuite_transactions
+# In dataform/definitions/silver/netsuite/silver_netsuite_transactions.sqlx:
+SAFE_CAST(custbody_delivery_terms AS STRING) AS delivery_terms</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 8: Observability & Auditing -->
+      <section class="card" id="observability">
+        <h2>
+          <span class="badge badge-blue">Governance</span>
+          Audit Logging &amp; Telemetry Schema
+        </h2>
+        <p>Every pipeline run records execution telemetry into <code>audit_metadata.ingestion_execution_logs</code>.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Field Name</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>dag_id</code></td><td>STRING</td><td>Airflow DAG Identifier</td></tr>
+            <tr><td><code>task_id</code></td><td>STRING</td><td>Framework Ingestion Task ID</td></tr>
+            <tr><td><code>run_id</code></td><td>STRING</td><td>DagRun execution UUID</td></tr>
+            <tr><td><code>source_type</code></td><td>STRING</td><td>Source classification (<code>netsuite</code>, <code>p6</code>, <code>atlas</code>)</td></tr>
+            <tr><td><code>engine_type</code></td><td>STRING</td><td>Execution engine (<code>cloud_run_function</code>, <code>dataflow</code>)</td></tr>
+            <tr><td><code>records_extracted</code></td><td>INT64</td><td>Total rows extracted from source</td></tr>
+            <tr><td><code>bytes_written</code></td><td>INT64</td><td>Total Parquet/JSON bytes uploaded to GCS</td></tr>
+            <tr><td><code>status</code></td><td>STRING</td><td>Status outcome (<code>SUCCESS</code>, <code>FAILED</code>)</td></tr>
+            <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>Log creation timestamp (Partition Key)</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Section 8: Troubleshooting Runbook -->
+      <section class="card" id="troubleshooting">
+        <h2>
+          <span class="badge badge-red">Runbook</span>
+          Operational Troubleshooting
+        </h2>
+        
+        <div class="step-list">
+          <div class="step-item">
+            <div class="step-number">!</div>
+            <div class="step-content">
+              <div class="step-title">NetSuite HTTP 429 Concurrency Limit</div>
+              <p><strong>Root Cause:</strong> NetSuite limits concurrent web service queries per account tier.<br/>
+              <strong>Resolution:</strong> The framework extractor automatically applies exponential backoff up to 5 retries. Concurrency in Airflow default_args is set to 1.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">!</div>
+            <div class="step-content">
+              <div class="step-title">BigQuery Schema Mismatch during Load</div>
+              <p><strong>Root Cause:</strong> Source added a new column or modified a data type.<br/>
+              <strong>Resolution:</strong> Update <code>config/schemas/{source}/{task}_schema.json</code> and regenerate the DAG using <code>dag_generator.py</code>.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">!</div>
+            <div class="step-content">
+              <div class="step-title">Dataform Assertion Failure Alert</div>
+              <p><strong>Root Cause:</strong> Bad record violated unique key or date logic in Silver model.<br/>
+              <strong>Resolution:</strong> Inspect table in <code>dataform_assertions.*</code> dataset to identify the conflicting row.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ============================================================
+       Interactive Lightbox Modal with Pan, Zoom, Reset, & Controls
+       ============================================================ -->
+  <div id="lightbox-modal" class="lightbox-modal" role="dialog" aria-modal="true" aria-labelledby="lightbox-title-text">
+    <div class="lightbox-backdrop" onclick="closeLightbox()"></div>
+    <div class="lightbox-content">
+      <div class="lightbox-header">
+        <div class="lightbox-title">
+          <span class="badge badge-blue">Interactive HD Viewer</span>
+          <span id="lightbox-title-text">Diagram Preview</span>
+        </div>
+        <div class="lightbox-controls">
+          <div class="zoom-level-pill" id="zoom-pill" title="Current Zoom Scale">100%</div>
+          <button class="ctrl-btn" onclick="zoomIn()" title="Zoom In (Key: + or =)">🔍+ In</button>
+          <button class="ctrl-btn" onclick="zoomOut()" title="Zoom Out (Key: -)">🔍− Out</button>
+          <button class="ctrl-btn" onclick="fitToScreen()" title="Fit to Screen (Key: F)">⤢ Fit</button>
+          <button class="ctrl-btn" onclick="resetZoom()" title="Reset to 100% (Key: 0)">1:1</button>
+          <button class="ctrl-btn" onclick="toggleDarkMode()" title="Toggle Dark/Light Blueprint View">🌓 Theme</button>
+          <button class="ctrl-btn" onclick="downloadSvg()" title="Download High-Res SVG">📥 SVG</button>
+          <button class="ctrl-btn close-btn" onclick="closeLightbox()" title="Close Viewer (Esc)">✕ Close</button>
+        </div>
+      </div>
+      <div class="lightbox-body" id="lightbox-body">
+        <div class="lightbox-viewport" id="lightbox-viewport">
+          <div class="lightbox-svg-container" id="lightbox-svg-container">
+            <!-- Full vector SVG injected dynamically -->
+          </div>
+        </div>
+        <div class="lightbox-hints">
+          💡 <strong>Controls:</strong> Drag to pan &bull; Scroll wheel to zoom &bull; <code>+</code>/<code>-</code> zoom &bull; <code>0</code> reset &bull; <code>F</code> fit &bull; <code>Esc</code> close
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    Elementl Power Data Platform &bull; Metadata-Driven Ingestion &amp; Transformation Framework &bull; Built on Google Cloud Platform
+  </footer>
+
+  <script>
+    // Tab Switching Logic
+    function openTab(evt, tabName) {
+      const tabPanes = document.getElementsByClassName("tab-pane");
+      for (let i = 0; i < tabPanes.length; i++) {
+        tabPanes[i].classList.remove("active");
+      }
+      const tabBtns = document.getElementsByClassName("tab-btn");
+      for (let i = 0; i < tabBtns.length; i++) {
+        tabBtns[i].classList.remove("active");
+      }
+      const targetPane = document.getElementById(tabName);
+      if (targetPane) {
+        targetPane.classList.add("active");
+        if (window.mermaid && typeof window.mermaid.run === "function") {
+          const unrendered = targetPane.querySelectorAll("pre.mermaid:not([data-processed='true'])");
+          if (unrendered.length > 0) {
+            window.mermaid.run({ nodes: unrendered });
+          }
+        }
+      }
+      if (evt && evt.currentTarget) evt.currentTarget.classList.add("active");
+    }
+
+    // Interactive Lightbox, Pan & Zoom Engine
+    let currentZoom = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let currentItemWidth = 1400;
+    let currentItemHeight = 800;
+
+    const modal = document.getElementById("lightbox-modal");
+    const body = document.getElementById("lightbox-body");
+    const viewport = document.getElementById("lightbox-viewport");
+    const container = document.getElementById("lightbox-svg-container");
+    const titleText = document.getElementById("lightbox-title-text");
+    const zoomPill = document.getElementById("zoom-pill");
+
+    function openLightbox(element, title) {
+      if (!element) return;
+
+      // Find the SVG diagram specifically (ignoring any non-diagram SVGs)
+      let svg = null;
+      if (element.tagName && element.tagName.toLowerCase() === "svg") {
+        svg = element;
+      } else {
+        svg = element.querySelector("svg.mermaid, svg[id^='mermaid'], pre.mermaid svg, svg");
+      }
+
+      if (!svg) {
+        console.warn("No SVG diagram found in clicked element", element);
+        return;
+      }
+
+      titleText.textContent = title || element.getAttribute("data-title") || "High-Definition Architecture Diagram";
+      container.innerHTML = "";
+
+      // 1. Calculate true natural vector dimensions from viewBox or client rect
+      let vbWidth = 1400;
+      let vbHeight = 800;
+
+      const vbAttr = svg.getAttribute("viewBox");
+      if (vbAttr) {
+        const parts = vbAttr.trim().split(/[\s,]+/);
+        if (parts.length === 4 && parseFloat(parts[2]) > 0 && parseFloat(parts[3]) > 0) {
+          vbWidth = parseFloat(parts[2]);
+          vbHeight = parseFloat(parts[3]);
+        }
+      } else if (svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width > 0) {
+        vbWidth = svg.viewBox.baseVal.width;
+        vbHeight = svg.viewBox.baseVal.height;
+      } else {
+        try {
+          const bbox = svg.getBBox();
+          if (bbox && bbox.width > 50 && bbox.height > 50) {
+            vbWidth = bbox.width;
+            vbHeight = bbox.height;
+          }
+        } catch (err) {
+          const bcr = svg.getBoundingClientRect();
+          if (bcr.width > 50 && bcr.height > 50) {
+            vbWidth = bcr.width;
+            vbHeight = bcr.height;
+          }
+        }
+      }
+
+      currentItemWidth = vbWidth;
+      currentItemHeight = vbHeight;
+
+      // 2. Clone SVG and preserve all styles and definitions
+      const clonedSvg = svg.cloneNode(true);
+      clonedSvg.classList.add("lightbox-active-svg");
+
+      // Strip any constraining inline styles from Mermaid on the page
+      clonedSvg.removeAttribute("style");
+
+      // Set explicit natural dimensions and viewBox
+      clonedSvg.setAttribute("viewBox", vbAttr || `0 0 ${vbWidth} ${vbHeight}`);
+      clonedSvg.setAttribute("width", vbWidth);
+      clonedSvg.setAttribute("height", vbHeight);
+      clonedSvg.style.width = vbWidth + "px";
+      clonedSvg.style.height = vbHeight + "px";
+      clonedSvg.style.maxWidth = "none";
+      clonedSvg.style.minWidth = "0";
+      clonedSvg.style.display = "block";
+
+      // Copy any scoped Mermaid stylesheet in <head> so full styling applies
+      if (svg.id) {
+        document.querySelectorAll("head style").forEach(hs => {
+          if (hs.textContent && hs.textContent.includes(svg.id)) {
+            const styleClone = hs.cloneNode(true);
+            container.appendChild(styleClone);
+          }
+        });
+      }
+
+      container.appendChild(clonedSvg);
+
+      modal.classList.add("active");
+      document.body.style.overflow = "hidden";
+
+      // Reset transforms and fit nicely to viewport
+      panX = 0;
+      panY = 0;
+      setTimeout(() => {
+        fitToScreen();
+      }, 40);
+    }
+
+    function closeLightbox() {
+      modal.classList.remove("active");
+      document.body.style.overflow = "auto";
+      container.innerHTML = "";
+      currentZoom = 1.0;
+      panX = 0;
+      panY = 0;
+      applyTransform(false);
+    }
+
+    function resetTransforms() {
+      currentZoom = 1.0;
+      panX = 0;
+      panY = 0;
+      applyTransform(false);
+    }
+
+    function applyTransform(animate = false) {
+      viewport.style.transition = animate ? "transform 0.18s cubic-bezier(0.2, 0, 0, 1)" : "none";
+      viewport.style.transform = "translate(" + panX + "px, " + panY + "px) scale(" + currentZoom + ")";
+      zoomPill.textContent = Math.round(currentZoom * 100) + "%";
+    }
+
+    function zoomIn(factor = 1.25) {
+      if (currentZoom < 6.0) {
+        currentZoom = Math.min(currentZoom * factor, 6.0);
+        applyTransform(true);
+      }
+    }
+
+    function zoomOut(factor = 0.8) {
+      if (currentZoom > 0.15) {
+        currentZoom = Math.max(currentZoom * factor, 0.15);
+        applyTransform(true);
+      }
+    }
+
+    function resetZoom() {
+      currentZoom = 1.0;
+      panX = 0;
+      panY = 0;
+      applyTransform(true);
+    }
+
+    function fitToScreen() {
+      const content = container.querySelector(".lightbox-active-svg") || container.firstElementChild;
+      if (!content) return;
+
+      const bodyRect = body.getBoundingClientRect();
+      const nw = currentItemWidth || 1400;
+      const nh = currentItemHeight || 800;
+
+      // Fit inside 90% of modal viewport width & 88% height
+      const availWidth = bodyRect.width * 0.90;
+      const availHeight = bodyRect.height * 0.88;
+
+      const scaleX = availWidth / nw;
+      const scaleY = availHeight / nh;
+      let targetZoom = Math.min(scaleX, scaleY);
+
+      if (targetZoom > 2.2) targetZoom = 2.2;
+      if (targetZoom < 0.25) targetZoom = 0.25;
+
+      currentZoom = targetZoom;
+      panX = 0;
+      panY = 0;
+      applyTransform(true);
+    }
+
+    function toggleDarkMode() {
+      body.classList.toggle("dark-mode");
+    }
+
+    function downloadSvg() {
+      const svg = container.querySelector("svg");
+      if (svg) {
+        const serializer = new XMLSerializer();
+        const source = '<?xml version="1.0" standalone="no"?>\r\n' + serializer.serializeToString(svg);
+        const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = (titleText.textContent || "diagram").toLowerCase().replace(/[^a-z0-9]/g, "_") + ".svg";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return;
+      }
+    }
+
+    // Global click listener delegation for diagram boxes
+    document.addEventListener("click", function(e) {
+      if (e.target.closest("#lightbox-modal")) return;
+
+      const box = e.target.closest(".diagram-box");
+      if (box) {
+        const title = box.getAttribute("data-title") || "High-Definition Architecture Diagram";
+        openLightbox(box, title);
+        return;
+      }
+    });
+
+    // Mouse Pan / Drag Events
+    body.addEventListener("mousedown", function(e) {
+      if (e.target.closest(".ctrl-btn")) return;
+      isDragging = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+      body.style.cursor = "grabbing";
+    });
+
+    window.addEventListener("mousemove", function(e) {
+      if (!isDragging) return;
+      panX = e.clientX - startX;
+      panY = e.clientY - startY;
+      applyTransform(false);
+    });
+
+    window.addEventListener("mouseup", function() {
+      if (isDragging) {
+        isDragging = false;
+        body.style.cursor = "grab";
+      }
+    });
+
+    // Smooth Mouse Wheel Zoom
+    body.addEventListener("wheel", function(e) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 1.15 : 0.87;
+      const newZoom = currentZoom * delta;
+      if (newZoom >= 0.15 && newZoom <= 6.0) {
+        currentZoom = newZoom;
+        applyTransform(false);
+      }
+    }, { passive: false });
+
+    // Keyboard Shortcuts
+    document.addEventListener("keydown", function(e) {
+      if (!modal.classList.contains("active")) return;
+      if (e.key === "Escape") {
+        closeLightbox();
+      } else if (e.key === "+" || e.key === "=") {
+        zoomIn();
+      } else if (e.key === "-" || e.key === "_") {
+        zoomOut();
+      } else if (e.key === "0") {
+        resetZoom();
+      } else if (e.key === "f" || e.key === "F") {
+        fitToScreen();
+      } else if (e.key === "ArrowLeft") {
+        panX += 50; applyTransform(true);
+      } else if (e.key === "ArrowRight") {
+        panX -= 50; applyTransform(true);
+      } else if (e.key === "ArrowUp") {
+        panY += 50; applyTransform(true);
+      } else if (e.key === "ArrowDown") {
+        panY -= 50; applyTransform(true);
+      }
+    });
+  </script>
+</body>
+</html>

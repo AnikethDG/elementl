@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Core App Infrastructure GCS State Backend (Isolated from UDP State)
-# State path: gs://gcs-<project_id>-tfstate/terraform/infra/state/default.tfstate
-terraform {
-  backend "gcs" {
-    prefix = "terraform/infra/state"
-  }
-}
+"""Utility script to onboard new tables into apps/udp/configs/."""
+
+import sys
+
+def main():
+    print("UDP declarative table onboarding helper ready.")
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,67 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+template: ingestion_task_metadata
+version: '1.0'
+task_id: sample_oracle_p6_csv
+display_name: "Sample P6 CSV Ingestion"
+description: "Sample configuration demonstrating CSV landing format for Primavera P6 JDBC extraction."
+domain: "projects"
+metadata_status: Active
+
+source:
+  type: oracle_p6
+  load_type: full_refresh
+  watermark_column: last_recalc_date
+  connection_secret_id: "secret-p6-db-credentials"
+  extraction_type: jdbc
+  source_table: PROJECT
+  primary_key: PROJ_ID
+  where_clause: "ROWNUM <= 10"
+  max_records: 10
+  fetch_size: 5000
+  timeout_seconds: 300
+
+engine:
+  type: cloud_run_job
+  job_name: jdbc-ingestion
+  timeout_seconds: 1800
+
+destination:
+  format: CSV
+  schema_strategy: static
+  gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
+  gcs_prefix: "oracle_p6/raw/sample_oracle_p6_csv/dt={{ ds }}/"
+  bq_project: "elementl-509009"
+  bq_dataset: "ds_bronze_oracle_p6"
+  bq_table: "sample_oracle_p6_csv"
+  write_disposition: WRITE_TRUNCATE
+  partition_field: ingestion_date
+  cluster_fields:
+    - PROJ_ID
+
+orchestration:
+  dag_id: dag_udp_sample_oracle_p6_csv
+  schedule: "@daily"
+  start_date: "2024-01-01 00:00:00"
+  catchup: false
+  retries: 1
+  retry_delay_minutes: 5
+  dataform:
+    enabled: true
+    target_dataset: "ds_silver_oracle_p6"
+    target_table: "stg_sample_p6_csv"
+    included_tags:
+      - p6
+      - sample_p6_csv

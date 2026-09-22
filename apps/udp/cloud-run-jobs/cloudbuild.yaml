@@ -1,0 +1,84 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Unified Cloud Build pipeline for building & pushing all 4 UDP Cloud Run Job Docker images
+# from apps/udp/cloud-run-jobs/ to the Terraform-managed Artifact Registry (udp-ingestion-jobs)
+# in the non-sensitive staging GCP project (pid-nse-stg-core-apps-k8ti).
+steps:
+  - id: 'build-arcgis-ingestion'
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:${_TAG}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:latest'
+      - '-f'
+      - 'arcgis-ingestion/Dockerfile'
+      - '.'
+
+  - id: 'build-bulk-ingestion'
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:${_TAG}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:latest'
+      - '-f'
+      - 'bulk-ingestion/Dockerfile'
+      - '.'
+
+  - id: 'build-suiteql-ingestion'
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:${_TAG}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:latest'
+      - '-f'
+      - 'suiteQL-ingestion/Dockerfile'
+      - '.'
+
+  - id: 'build-jdbc-ingestion'
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:${_TAG}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:latest'
+      - '-f'
+      - 'jdbc-ingestion/Dockerfile'
+      - '.'
+
+images:
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/arcgis-ingestion:latest'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/bulk-ingestion:latest'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/suiteql-ingestion:latest'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${_TARGET_PROJECT_ID}/${_REPOSITORY}/jdbc-ingestion:latest'
+
+substitutions:
+  _REGION: 'us-central1'
+  _TARGET_PROJECT_ID: 'pid-nse-stg-core-apps-k8ti'
+  _REPOSITORY: 'udp-ingestion-jobs'
+  _TAG: 'latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8'

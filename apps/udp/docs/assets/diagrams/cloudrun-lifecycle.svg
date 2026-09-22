@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620" role="img"
+     aria-labelledby="crj-title" style="font-family:'Google Sans','Inter',-apple-system,sans-serif">
+<title id="crj-title">Cloud Run Job execution lifecycle driven by CloudRunExecuteJobOperator</title>
+<style>
+.dgm-card{fill:var(--bg);stroke:var(--border-strong);stroke-width:1}
+.dgm-alt{fill:var(--bg-alt);stroke:var(--border);stroke-width:1}
+.dgm-t{font-size:15px;font-weight:600;fill:var(--text)}
+.dgm-s{font-size:12px;fill:var(--text-2)}
+.dgm-m{font-size:11.5px;fill:var(--text-2);font-family:'Roboto Mono',ui-monospace,monospace}
+.dgm-e{font-size:10.5px;font-weight:700;fill:var(--text-3);letter-spacing:.9px}
+.dgm-l{font-size:12px;font-weight:600;fill:var(--text-2)}
+.dgm-flow{fill:none;stroke:var(--border-strong);stroke-width:2}
+.dgm-head{fill:var(--border-strong)}
+.dgm-ic{fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+</style>
+<defs>
+  <marker id="crj-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0L10 5L0 10z" class="dgm-head"/>
+  </marker>
+  <clipPath id="crj-c1"><rect x="60" y="16" width="840" height="76" rx="12"/></clipPath>
+  <clipPath id="crj-c2"><rect x="60" y="140" width="840" height="196" rx="12"/></clipPath>
+  <clipPath id="crj-c3"><rect x="60" y="384" width="840" height="96" rx="12"/></clipPath>
+  <clipPath id="crj-c4"><rect x="60" y="528" width="840" height="76" rx="12"/></clipPath>
+</defs>
+
+<!-- ============ Composer ============ -->
+<rect x="60" y="16" width="840" height="76" rx="12" class="dgm-card"/>
+<rect x="60" y="16" width="6" height="76" clip-path="url(#crj-c1)" style="fill:var(--gc-blue)"/>
+<rect x="88" y="36" width="34" height="34" rx="9" style="fill:var(--gc-blue);opacity:.14"/>
+<g class="dgm-ic" style="stroke:var(--gc-blue)" transform="translate(97,45)">
+  <circle cx="8" cy="8" r="6.6"/><path d="M8 4.2V8l2.6 2.2"/>
+</g>
+<text x="136" y="47" class="dgm-t">Cloud Composer — Airflow DAG</text>
+<text x="136" y="70" class="dgm-s">Schedules <tspan style="font-family:'Roboto Mono',monospace">dag_udp_&lt;task_id&gt;</tspan> and owns retries, SLAs and alerting</text>
+<text x="884" y="46" class="dgm-e" text-anchor="end">ORCHESTRATION</text>
+
+<path d="M480 92V128" class="dgm-flow" marker-end="url(#crj-ah)"/>
+<text x="498" y="115" class="dgm-l">1 · Dispatch with container env overrides</text>
+
+<!-- ============ Cloud Run Job ============ -->
+<rect x="60" y="140" width="840" height="196" rx="12" class="dgm-card"/>
+<rect x="60" y="140" width="6" height="196" clip-path="url(#crj-c2)" style="fill:var(--gc-green)"/>
+<rect x="88" y="158" width="34" height="34" rx="9" style="fill:var(--gc-green);opacity:.14"/>
+<g class="dgm-ic" style="stroke:var(--gc-green)" transform="translate(97,167)">
+  <rect x="1" y="4" width="14" height="9" rx="2.2"/><path d="M4.4 4V2.4M11.6 4V2.4M5.4 8.5h5.2"/>
+</g>
+<text x="136" y="170" class="dgm-t">Cloud Run Job container — run-to-completion batch task</text>
+<text x="884" y="169" class="dgm-e" text-anchor="end">CLOUD RUN · UP TO 24 H</text>
+
+<g class="dgm-s">
+  <circle cx="146" cy="196" r="3.4" style="fill:var(--gc-green)"/>
+  <text x="162" y="200">Parses <tspan style="font-family:'Roboto Mono',monospace">IngestionJobConfig.from_env()</tspan> and resolves Secret Manager credentials</text>
+  <circle cx="146" cy="222" r="3.4" style="fill:var(--gc-green)"/>
+  <text x="162" y="226">Extracts records from the source API or database</text>
+  <circle cx="146" cy="248" r="3.4" style="fill:var(--gc-green)"/>
+  <text x="162" y="252">Coerces ISO-8601 strings into native PyArrow timestamp / date types</text>
+  <circle cx="146" cy="274" r="3.4" style="fill:var(--gc-green)"/>
+  <text x="162" y="278">Writes Snappy Parquet to the GCS Bronze partition path</text>
+  <circle cx="146" cy="300" r="3.4" style="fill:var(--gc-green)"/>
+  <text x="162" y="304">Emits <tspan style="font-family:'Roboto Mono',monospace">_job_results/&lt;task_id&gt;/&lt;run_id&gt;.json</tspan> + audit row in <tspan style="font-family:'Roboto Mono',monospace">ds_operations</tspan></text>
+</g>
+
+<path d="M480 336V372" class="dgm-flow" marker-end="url(#crj-ah)"/>
+<text x="498" y="359" class="dgm-l">2 · Job terminates with exit code 0</text>
+
+<!-- ============ GCSToBigQuery ============ -->
+<rect x="60" y="384" width="840" height="96" rx="12" class="dgm-card"/>
+<rect x="60" y="384" width="6" height="96" clip-path="url(#crj-c3)" style="fill:var(--gc-yellow-dark)"/>
+<rect x="88" y="404" width="34" height="34" rx="9" style="fill:var(--gc-yellow-dark);opacity:.16"/>
+<g class="dgm-ic" style="stroke:var(--gc-yellow-dark)" transform="translate(97,413)">
+  <path d="M8 1.4v9.4M4.4 7.2L8 10.8l3.6-3.6M1.6 13.6h12.8"/>
+</g>
+<text x="136" y="415" class="dgm-t">Airflow GCSToBigQueryOperator</text>
+<text x="884" y="414" class="dgm-e" text-anchor="end">BATCH LOAD</text>
+<text x="136" y="438" class="dgm-m">gs://&lt;bucket&gt;/&lt;source&gt;/raw/&lt;target_table&gt;/dt={{ ds }}/*.parquet</text>
+<text x="136" y="462" class="dgm-s">Schema auto-detected from Parquet · WRITE_APPEND / WRITE_TRUNCATE per task config</text>
+
+<path d="M480 480V516" class="dgm-flow" marker-end="url(#crj-ah)"/>
+
+<!-- ============ BigQuery Bronze ============ -->
+<rect x="60" y="528" width="840" height="76" rx="12" class="dgm-card"/>
+<rect x="60" y="528" width="6" height="76" clip-path="url(#crj-c4)" style="fill:var(--gc-blue)"/>
+<rect x="88" y="548" width="34" height="34" rx="9" style="fill:var(--gc-blue);opacity:.14"/>
+<g class="dgm-ic" style="stroke:var(--gc-blue)" transform="translate(97,557)">
+  <circle cx="7.6" cy="7.6" r="6.4"/><path d="M12.4 12.4L16 16"/><path d="M5.4 8.8v1.8M7.6 6.2v4.4M9.8 8v2.6"/>
+</g>
+<text x="136" y="559" class="dgm-t">BigQuery Bronze table</text>
+<text x="884" y="558" class="dgm-e" text-anchor="end">BIGQUERY</text>
+<text x="136" y="582" class="dgm-m">{PROJECT_ID}.{target_dataset}.{target_table}</text>
+</svg>

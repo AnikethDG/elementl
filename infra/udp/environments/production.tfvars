@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Core App Infrastructure GCS State Backend (Isolated from UDP State)
-# State path: gs://gcs-<project_id>-tfstate/terraform/infra/state/default.tfstate
-terraform {
-  backend "gcs" {
-    prefix = "terraform/infra/state"
-  }
-}
+project_id                = "pid-nse-prd-core-apps-6aw8"
+region                    = "us-central1"
+environment               = "production"
+vpc_network               = "projects/pid-ns-prd-us-netw-x2kf/global/networks/vpc-ns-prd-us"
+vpc_subnet                = "projects/pid-ns-prd-us-netw-x2kf/regions/us-central1/subnetworks/sub-ns-prd-usc1"
+artifact_registry_repo_id = "udp-ingestion-jobs"
+image_tag                 = "latest"
+enable_composer           = true
+composer_image_version    = "composer-3-airflow-3"

@@ -1,0 +1,74 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+template: ingestion_task_metadata
+version: '1.0'
+task_id: oracle_p6_activitycode
+display_name: "Primavera P6 Activity Code Values"
+description: "Extracts activity code dictionary values, descriptions, and code hierarchies."
+domain: "project_controls"
+metadata_status: Active
+
+source:
+  type: oracle_p6
+  connection_type: jdbc
+  connection_secret_id: "secret-p6-db-config"
+  source_schema: "ELEMENTL_PMDB_SBOX_PXRPTUSER"
+  source_table: ACTIVITYCODE
+  primary_key: OBJECTID
+  load_type: full_refresh
+  watermark_column: LASTUPDATEDATE
+  where_clause: "ROWNUM <= 20"
+  max_records: 20
+  fetch_size: 5000
+  timeout_seconds: 300
+
+engine:
+  type: cloud_run_job
+  job_name: jdbc-ingestion
+  timeout_seconds: 1800
+
+destination:
+  format: PARQUET
+  schema_strategy: static
+  gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
+  gcs_prefix: "oracle_p6/raw/oracle_p6_activitycode/dt={{ ds }}/"
+  bq_project: "elementl-509009"
+  bq_dataset: "ds_bronze_oracle_p6"
+  bq_table: "oracle_p6_activitycode"
+  write_disposition: WRITE_TRUNCATE
+  partition_field: ingestion_date
+  cluster_fields:
+    - OBJECTID
+
+orchestration:
+  dag_id: dag_udp_oracle_p6_activitycode
+  schedule: "@daily"
+  start_date: "2024-01-01 00:00:00"
+  catchup: false
+  retries: 2
+  retry_delay_minutes: 5
+  concurrency: 1
+  dag_tags:
+    - "source:oracle_p6"
+    - "engine:cloud_run_job"
+    - "zone:raw"
+  dataform:
+    enabled: true
+    target_dataset: "ds_silver_oracle_p6"
+    target_table: "stg_oracle_p6_activitycode"
+    included_tags:
+      - "oracle_p6"
+      - "oracle_p6_activitycode"
+    transitive_dependencies_included: false

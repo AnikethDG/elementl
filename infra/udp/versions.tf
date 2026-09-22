@@ -12,10 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Core App Infrastructure GCS State Backend (Isolated from UDP State)
-# State path: gs://gcs-<project_id>-tfstate/terraform/infra/state/default.tfstate
 terraform {
-  backend "gcs" {
-    prefix = "terraform/infra/state"
+  required_version = ">= 1.5.0"
+
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0"
+    }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 5.0"
+    }
   }
+}
+
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+provider "google-beta" {
+  project = var.project_id
+  region  = var.region
 }

@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 868" role="img"
+     aria-labelledby="med-title" style="font-family:'Google Sans','Inter',-apple-system,sans-serif">
+<title id="med-title">End-to-end medallion data lifecycle from source systems through Bronze, Silver and Gold</title>
+<style>
+.dgm-card{fill:var(--bg);stroke:var(--border-strong);stroke-width:1}
+.dgm-alt{fill:var(--bg-alt);stroke:var(--border);stroke-width:1}
+.dgm-group{fill:none;stroke:var(--gc-blue-border);stroke-width:1.5;stroke-dasharray:7 5}
+.dgm-t{font-size:15px;font-weight:600;fill:var(--text)}
+.dgm-s{font-size:12px;fill:var(--text-2)}
+.dgm-m{font-size:11.5px;fill:var(--text-2);font-family:'Roboto Mono',ui-monospace,monospace}
+.dgm-e{font-size:10.5px;font-weight:700;fill:var(--text-3);letter-spacing:.9px}
+.dgm-l{font-size:12px;font-weight:600;fill:var(--text-2)}
+.dgm-flow{fill:none;stroke:var(--border-strong);stroke-width:2}
+.dgm-head{fill:var(--border-strong)}
+.dgm-ic{fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+</style>
+<defs>
+  <marker id="med-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0L10 5L0 10z" class="dgm-head"/>
+  </marker>
+  <clipPath id="med-c1"><rect x="60" y="20" width="840" height="108" rx="12"/></clipPath>
+  <clipPath id="med-c2"><rect x="60" y="184" width="840" height="124" rx="12"/></clipPath>
+  <clipPath id="med-c3"><rect x="60" y="364" width="840" height="124" rx="12"/></clipPath>
+  <clipPath id="med-c4"><rect x="60" y="544" width="840" height="124" rx="12"/></clipPath>
+  <clipPath id="med-c5"><rect x="60" y="724" width="840" height="124" rx="12"/></clipPath>
+</defs>
+
+<!-- ============ 1. Upstream source systems ============ -->
+<rect x="60" y="20" width="840" height="108" rx="12" class="dgm-card"/>
+<rect x="60" y="20" width="6" height="108" clip-path="url(#med-c1)" style="fill:var(--gc-purple)"/>
+<rect x="88" y="34" width="34" height="34" rx="9" style="fill:var(--gc-purple);opacity:.14"/>
+<g class="dgm-ic" style="stroke:var(--gc-purple)" transform="translate(97,43)">
+  <ellipse cx="8" cy="3.4" rx="7.2" ry="2.8"/>
+  <path d="M.8 3.4v9.2c0 1.55 3.22 2.8 7.2 2.8s7.2-1.25 7.2-2.8V3.4"/>
+  <path d="M.8 8c0 1.55 3.22 2.8 7.2 2.8S15.2 9.55 15.2 8"/>
+</g>
+<text x="136" y="49" class="dgm-t">Upstream source systems</text>
+<text x="884" y="48" class="dgm-e" text-anchor="end">STEP 0 · SYSTEMS OF RECORD</text>
+
+<rect x="136" y="66" width="241" height="42" rx="9" class="dgm-alt"/>
+<text x="150" y="84" class="dgm-s" style="fill:var(--text);font-weight:600">NetSuite ERP</text>
+<text x="150" y="100" class="dgm-m">SuiteQL · OAuth 2.0 M2M JWT</text>
+
+<rect x="389" y="66" width="241" height="42" rx="9" class="dgm-alt"/>
+<text x="403" y="84" class="dgm-s" style="fill:var(--text);font-weight:600">Oracle Primavera P6</text>
+<text x="403" y="100" class="dgm-m">JDBC over TCPS :2484</text>
+
+<rect x="642" y="66" width="242" height="42" rx="9" class="dgm-alt"/>
+<text x="656" y="84" class="dgm-s" style="fill:var(--text);font-weight:600">Elementl Atlas</text>
+<text x="656" y="100" class="dgm-m">ArcGIS REST · bulk spatial</text>
+
+<path d="M480 128V172" class="dgm-flow" marker-end="url(#med-ah)"/>
+<text x="498" y="155" class="dgm-l">1 · Extract &amp; stream via Cloud Run Jobs</text>
+
+<!-- ============ 2. GCS Bronze lake ============ -->
+<rect x="60" y="184" width="840" height="124" rx="12" class="dgm-card"/>
+<rect x="60" y="184" width="6" height="124" clip-path="url(#med-c2)" style="fill:var(--gc-blue)"/>
+<rect x="88" y="200" width="34" height="34" rx="9" style="fill:var(--gc-blue);opacity:.14"/>
+<g class="dgm-ic" style="stroke:var(--gc-blue)" transform="translate(97,209)">
+  <path d="M1 2.6h14l-1.6 12.2a1.6 1.6 0 0 1-1.6 1.4H4.2a1.6 1.6 0 0 1-1.6-1.4z"/>
+  <path d="M5.2 6.6v6M10.8 6.6v6"/>
+</g>
+<text x="136" y="220" class="dgm-t">GCS Bronze lake — immutable raw landing</text>
+<text x="884" y="219" class="dgm-e" text-anchor="end">CLOUD STORAGE</text>
+<text x="136" y="244" class="dgm-m">gs://&lt;raw_landing_bucket&gt;/&lt;source_system&gt;/raw/&lt;target_table&gt;/dt=YYYY-MM-DD/data_*.parquet</text>
+<text x="136" y="266" class="dgm-s">Snappy-compressed Apache Parquet 2.6 · native Hive-style date partitioning</text>
+<text x="136" y="288" class="dgm-s">Enriched audit columns: <tspan style="font-family:'Roboto Mono',monospace">ingestion_date</tspan> (DATE) · <tspan style="font-family:'Roboto Mono',monospace">ingestion_timestamp</tspan> (TIMESTAMP UTC)</text>
+
+<path d="M480 308V352" class="dgm-flow" marker-end="url(#med-ah)"/>
+<text x="498" y="335" class="dgm-l">2 · Batch load via GCSToBigQueryOperator</text>
+
+<!-- ============ 3. BigQuery Bronze ============ -->
+<rect x="60" y="364" width="840" height="124" rx="12" class="dgm-card"/>
+<rect x="60" y="364" width="6" height="124" clip-path="url(#med-c3)" style="fill:var(--gc-yellow-dark)"/>
+<rect x="88" y="380" width="34" height="34" rx="9" style="fill:var(--gc-yellow-dark);opacity:.16"/>
+<g class="dgm-ic" style="stroke:var(--gc-yellow-dark)" transform="translate(97,389)">
+  <circle cx="7.6" cy="7.6" r="6.4"/><path d="M12.4 12.4L16 16"/><path d="M5.4 8.8v1.8M7.6 6.2v4.4M9.8 8v2.6"/>
+</g>
+<text x="136" y="400" class="dgm-t">BigQuery Bronze — raw landing tables</text>
+<text x="884" y="399" class="dgm-e" text-anchor="end">BIGQUERY</text>
+<text x="136" y="424" class="dgm-m">p-nsedusc1-data-landing</text>
+<text x="136" y="446" class="dgm-m" style="fill:var(--gc-yellow-dark)">ds_bronze_netsuite &#160;·&#160; ds_bronze_p6 &#160;·&#160; ds_bronze_atlas</text>
+<text x="136" y="468" class="dgm-s">Mirrors the source schema with zero transformation · WRITE_APPEND / WRITE_TRUNCATE per task config</text>
+
+<path d="M480 488V532" class="dgm-flow" marker-end="url(#med-ah)"/>
+<text x="498" y="515" class="dgm-l">3 · Dataform compilation &amp; workflow invocation</text>
+
+<!-- ============ 4. BigQuery Silver ============ -->
+<rect x="60" y="544" width="840" height="124" rx="12" class="dgm-card"/>
+<rect x="60" y="544" width="6" height="124" clip-path="url(#med-c4)" style="fill:var(--text-2)"/>
+<rect x="88" y="560" width="34" height="34" rx="9" style="fill:var(--text-2);opacity:.14"/>
+<g class="dgm-ic" style="stroke:var(--text-2)" transform="translate(97,569)">
+  <path d="M2 4.6l6-3.4 6 3.4v6.8l-6 3.4-6-3.4z"/><path d="M8 8l6-3.4M8 8v7.4M8 8L2 4.6"/>
+</g>
+<text x="136" y="580" class="dgm-t">BigQuery Silver — cleansed &amp; conformed</text>
+<text x="884" y="579" class="dgm-e" text-anchor="end">DATAFORM</text>
+<text x="136" y="604" class="dgm-m">p-nsedusc1-data-warehouse &#160;·&#160; <tspan style="fill:var(--text)">ds_silver</tspan></text>
+<text x="136" y="626" class="dgm-s">Type casting · timezone normalisation · windowed <tspan style="font-family:'Roboto Mono',monospace">ROW_NUMBER()</tspan> dedup on primary_key</text>
+<text x="136" y="648" class="dgm-s">Automated data-quality assertions — failed records land in <tspan style="font-family:'Roboto Mono',monospace">ds_dataform_assertions</tspan></text>
+
+<path d="M480 668V712" class="dgm-flow" marker-end="url(#med-ah)"/>
+<text x="498" y="695" class="dgm-l">4 · Analytical aggregation &amp; spatial joins</text>
+
+<!-- ============ 5. BigQuery Gold ============ -->
+<rect x="60" y="724" width="840" height="124" rx="12" class="dgm-card"/>
+<rect x="60" y="724" width="6" height="124" clip-path="url(#med-c5)" style="fill:var(--gc-yellow)"/>
+<rect x="88" y="740" width="34" height="34" rx="9" style="fill:var(--gc-yellow);opacity:.2"/>
+<g class="dgm-ic" style="stroke:var(--gc-yellow-dark)" transform="translate(97,749)">
+  <path d="M1.6 12.6h3.2v3.2H1.6zM6.4 7.4h3.2v8.4H6.4zM11.2 2.2h3.2v13.6h-3.2z"/>
+</g>
+<text x="136" y="760" class="dgm-t">BigQuery Gold — curated analytical marts</text>
+<text x="884" y="759" class="dgm-e" text-anchor="end">BIGQUERY · LOOKER</text>
+<text x="136" y="784" class="dgm-m">p-nsedusc1-data-warehouse · <tspan style="fill:var(--text)">ds_gold</tspan> &#160;&#8594;&#160; p-nsedusc1-data-atlas · <tspan style="fill:var(--text)">ds_atlas_analytics</tspan></text>
+<text x="136" y="806" class="dgm-s">Atlas GeoViz: <tspan style="font-family:'Roboto Mono',monospace">ST_INTERSECTS</tspan> / <tspan style="font-family:'Roboto Mono',monospace">ST_BUFFER</tspan> joins across quaternary faults &amp; urban areas</text>
+<text x="136" y="828" class="dgm-s">Financial &amp; project marts: project cost vs. progress, resource utilisation</text>
+</svg>

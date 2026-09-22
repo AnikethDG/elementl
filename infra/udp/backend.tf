@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Core App Infrastructure GCS State Backend (Isolated from UDP State)
-# State path: gs://gcs-<project_id>-tfstate/terraform/infra/state/default.tfstate
+# Unified Data Platform (UDP) GCS State Backend (Isolated from Core App Infra State)
+# State path: gs://gcs-<project_id>-tfstate/terraform/udp/state/default.tfstate
 terraform {
   backend "gcs" {
-    prefix = "terraform/infra/state"
+    prefix = "terraform/udp/state"
   }
 }

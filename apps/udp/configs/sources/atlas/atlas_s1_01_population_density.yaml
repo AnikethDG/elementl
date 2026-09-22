@@ -1,0 +1,79 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+template: ingestion_task_metadata
+version: '1.0'
+task_id: atlas_s1_01_population_density
+display_name: "U.S. Census Bureau ACS 5-Year Population Density"
+description: "Ingests nationwide Census Block Group demographic population and housing counts from U.S. Census Bureau ACS 5-Year API serving Criterion S1-01."
+domain: "demographics_socioeconomics"
+metadata_status: Active
+
+source:
+  type: atlas
+  category: tabular_api
+  format: tabular_jsonl
+  load_type: full_refresh
+  connection:
+    endpoint_url: "https://www2.census.gov/geo/tiger/TIGER2024/"
+    layer_id: "S1-01"
+    auth_type: none
+    query_params:
+      where: "1=1"
+      outFields: "*"
+    timeout_seconds: 180
+    max_retries: 5
+
+engine:
+  type: cloud_run_job
+  job_name: bulk-ingestion
+  timeout_seconds: 3600
+
+destination:
+  format: TABULAR_JSONL
+  schema_strategy: generic_envelope
+  domain_tags:
+    - "S1-01"
+    - "population_density"
+    - "exclusionary"
+  unpack_archive: true
+  gcs_bucket: "bkt-elementl-509009-udp-bronze-raw"
+  gcs_prefix: "atlas/raw/atlas_s1_01_population_density/dt={{ ds }}/"
+  bq_project: "elementl-509009"
+  bq_dataset: "ds_bronze_atlas"
+  bq_table: "atlas_s1_01_population_density"
+  write_disposition: WRITE_TRUNCATE
+  partition_field: ingestion_date
+
+orchestration:
+  dag_id: dag_udp_atlas_s1_01_population_density
+  schedule: "@weekly"
+  start_date: "2024-01-01 00:00:00"
+  catchup: false
+  retries: 2
+  retry_delay_minutes: 5
+  concurrency: 1
+  dag_tags:
+    - "source:atlas"
+    - "engine:cloud_run_job"
+    - "zone:raw"
+    - "criteria:s1_01"
+  dataform:
+    enabled: true
+    target_dataset: "ds_silver"
+    target_table: "stg_atlas_s1_01_population_density"
+    included_tags:
+      - "atlas"
+      - "atlas_s1_01_population_density"
+    transitive_dependencies_included: false

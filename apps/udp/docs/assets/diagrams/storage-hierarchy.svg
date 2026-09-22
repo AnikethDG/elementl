@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img"
+     aria-labelledby="sto-title" style="font-family:'Google Sans','Inter',-apple-system,sans-serif">
+<title id="sto-title">GCS Bronze bucket hierarchy: source system, medallion zone, target table, Hive date partition, Parquet file</title>
+<style>
+.dgm-card{fill:var(--bg);stroke:var(--border-strong);stroke-width:1}
+.dgm-alt{fill:var(--bg-alt);stroke:var(--border);stroke-width:1}
+.dgm-t{font-size:15px;font-weight:600;fill:var(--text)}
+.dgm-s{font-size:12px;fill:var(--text-2)}
+.dgm-m{font-size:11.5px;fill:var(--text-2);font-family:'Roboto Mono',ui-monospace,monospace}
+.dgm-mk{font-size:12px;fill:var(--text);font-family:'Roboto Mono',ui-monospace,monospace}
+.dgm-e{font-size:10.5px;font-weight:700;fill:var(--text-3);letter-spacing:.9px}
+.dgm-note{font-size:11.5px;fill:var(--text-3)}
+.dgm-tree{fill:none;stroke:var(--border-strong);stroke-width:1.2}
+.dgm-ic{fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+</style>
+
+<rect x="20" y="10" width="920" height="420" rx="14" class="dgm-alt"/>
+
+<!-- ---------- tree connectors ---------- -->
+<g class="dgm-tree">
+  <path d="M84 52V370"/>
+  <path d="M84 70h20M84 250h20M84 310h20M84 370h20"/>
+  <path d="M118 82V100M118 100h20"/>
+  <path d="M152 112V220M152 130h20M152 220h20"/>
+  <path d="M186 142V160M186 160h20"/>
+  <path d="M220 172V190M220 190h20"/>
+  <path d="M118 262V280M118 280h20"/>
+  <path d="M118 322V340M118 340h20"/>
+  <path d="M118 382V400M118 400h20"/>
+</g>
+
+<!-- ---------- row 0: bucket root ---------- -->
+<g transform="translate(76,32)" style="fill:var(--gc-blue);fill-opacity:.16;stroke:var(--gc-blue);stroke-width:1.5;stroke-linejoin:round">
+  <path d="M1 2.2h14l-1.5 11.4a1.5 1.5 0 0 1-1.5 1.3H4a1.5 1.5 0 0 1-1.5-1.3z"/>
+</g>
+<text x="100" y="45" class="dgm-mk" style="font-weight:600">gs://&lt;raw_landing_bucket&gt;/</text>
+<text x="908" y="45" class="dgm-note" text-anchor="end">Resolved from environments/*.json</text>
+
+<!-- ---------- row 1: netsuite/ ---------- -->
+<g transform="translate(110,62)" style="fill:var(--gc-purple);fill-opacity:.16;stroke:var(--gc-purple);stroke-width:1.5;stroke-linejoin:round">
+  <path d="M.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3.9l1.5 1.9h6.6a1.2 1.2 0 0 1 1.2 1.2v6.1a1.2 1.2 0 0 1-1.2 1.2H2a1.2 1.2 0 0 1-1.2-1.2z"/>
+</g>
+<text x="134" y="75" class="dgm-mk">netsuite/</text>
+<text x="908" y="75" class="dgm-note" text-anchor="end">Source-system isolation · 11 tables</text>
+
+<!-- ---------- row 2: raw/ ---------- -->
+<g transform="translate(144,92)" style="fill:var(--text-3);fill-opacity:.16;stroke:var(--text-3);stroke-width:1.5;stroke-linejoin:round">
+  <path d="M.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3.9l1.5 1.9h6.6a1.2 1.2 0 0 1 1.2 1.2v6.1a1.2 1.2 0 0 1-1.2 1.2H2a1.2 1.2 0 0 1-1.2-1.2z"/>
+</g>
+<text x="168" y="105" class="dgm-mk">raw/</text>
+<text x="908" y="105" class="dgm-note" text-anchor="end">Medallion zone — Bronze</text>
+
+<!-- ---------- row 3: target table ---------- -->
+<g transform="translate(178,122)" style="fill:var(--gc-yellow-dark);fill-opacity:.18;stroke:var(--gc-yellow-dark);stroke-width:1.5;stroke-linejoin:round">
+  <path d="M.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3.9l1.5 1.9h6.6a1.2 1.2 0 0 1 1.2 1.2v6.1a1.2 1.2 0 0 1-1.2 1.2H2a1.2 1.2 0 0 1-1.2-1.2z"/>
+</g>
+<text x="202" y="135" class="dgm-mk">netsuite_account/</text>
+<text x="908" y="135" class="dgm-note" text-anchor="end">target_table key from the source YAML</text>
+
+<!-- ---------- row 4: Hive date partition ---------- -->
+<g transform="translate(212,152)" style="fill:var(--gc-green);fill-opacity:.18;stroke:var(--gc-green);stroke-width:1.5;stroke-linejoin:round">
+  <path d="M.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3.9l1.5 1.9h6.6a1.2 1.2 0 0 1 1.2 1.2v6.1a1.2 1.2 0 0 1-1.2 1.2H2a1.2 1.2 0 0 1-1.2-1.2z"/>
+</g>
+<text x="236" y="165" class="dgm-mk">dt=2026-09-18/</text>
+<text x="908" y="165" class="dgm-note" text-anchor="end">Hive-style partition = Airflow {{ ds }}</text>
+
+<!-- ---------- row 5: Parquet object ---------- -->
+<g transform="translate(246,182)" style="fill:var(--gc-blue);fill-opacity:.14;stroke:var(--gc-blue);stroke-width:1.5;stroke-linejoin:round">
+  <path d="M2.6 1.8h5.8l3.6 3.6v7.8a1.2 1.2 0 0 1-1.2 1.2H2.6a1.2 1.2 0 0 1-1.2-1.2V3a1.2 1.2 0 0 1 1.2-1.2z"/>
+  <path d="M8.4 1.8v3.6H12" style="fill:none"/>
+</g>
+<text x="270" y="195" class="dgm-mk" style="fill:var(--gc-blue)">data_20260918_110958.parquet</text>
+<text x="908" y="195" class="dgm-note" text-anchor="end">Snappy-compressed Apache Parquet</text>
+
+<!-- ---------- row 6: sibling tables ---------- -->
+<text x="202" y="225" class="dgm-mk" style="fill:var(--text-3)">netsuite_classification/ · netsuite_customer/ · …</text>
+<text x="908" y="225" class="dgm-note" text-anchor="end">Identical 3-level shape for every table</text>
+
+<!-- ---------- row 7: p6/ ---------- -->
+<g transform="translate(110,242)" style="fill:var(--gc-red);fill-opacity:.16;stroke:var(--gc-red);stroke-width:1.5;stroke-linejoin:round">
+  <path d="M.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3.9l1.5 1.9h6.6a1.2 1.2 0 0 1 1.2 1.2v6.1a1.2 1.2 0 0 1-1.2 1.2H2a1.2 1.2 0 0 1-1.2-1.2z"/>
+</g>
+<text x="134" y="255" class="dgm-mk">p6/</text>
+<text x="908" y="255" class="dgm-note" text-anchor="end">Oracle Primavera P6 · 15 tables</text>
+<text x="168" y="285" class="dgm-m">raw/p6_activity/dt=2026-09-18/data_*.parquet</text>
+
+<!-- ---------- row 9: atlas/ ---------- -->
+<g transform="translate(110,302)" style="fill:var(--gc-green);fill-opacity:.16;stroke:var(--gc-green);stroke-width:1.5;stroke-linejoin:round">
+  <path d="M.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3.9l1.5 1.9h6.6a1.2 1.2 0 0 1 1.2 1.2v6.1a1.2 1.2 0 0 1-1.2 1.2H2a1.2 1.2 0 0 1-1.2-1.2z"/>
+</g>
+<text x="134" y="315" class="dgm-mk">atlas/</text>
+<text x="908" y="315" class="dgm-note" text-anchor="end">Elementl Atlas geospatial · 4 layers</text>
+<text x="168" y="345" class="dgm-m">raw/atlas_s1_06_quaternary_faults/dt=2026-09-18/</text>
+
+<!-- ---------- row 11: _job_results/ ---------- -->
+<g transform="translate(110,362)" style="fill:var(--gc-yellow);fill-opacity:.22;stroke:var(--gc-yellow-dark);stroke-width:1.5;stroke-linejoin:round">
+  <path d="M.8 4.4a1.2 1.2 0 0 1 1.2-1.2h3.9l1.5 1.9h6.6a1.2 1.2 0 0 1 1.2 1.2v6.1a1.2 1.2 0 0 1-1.2 1.2H2a1.2 1.2 0 0 1-1.2-1.2z"/>
+</g>
+<text x="134" y="375" class="dgm-mk">_job_results/</text>
+<text x="908" y="375" class="dgm-note" text-anchor="end">Airflow XCom completion manifests</text>
+<text x="168" y="405" class="dgm-m">netsuite_account/manual__2026-09-18T11:09:57.json</text>
+</svg>

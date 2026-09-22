@@ -1,0 +1,116 @@
+# ==============================================================================
+# Cloud Build Pipeline: Standalone UDP Infrastructure (infra/udp/)
+# ==============================================================================
+# - Default Target Environment: Non-sensitive Stage GCP Project (pid-nse-stg-core-apps-k8ti)
+# - Isolated State File: gs://<STATE_BUCKET>/terraform/udp/state/default.tfstate
+# ==============================================================================
+
+steps:
+  # 1. Resolve Environment & Terraform Init (infra/udp/)
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        RAW_ENV="${_ENVIRONMENT}"
+        case "$PROJECT_ID" in
+          *dev*)
+            ENVIRONMENT="development"
+            ENVIRONMENT_SHORT="dev"
+            ;;
+          *prd*)
+            ENVIRONMENT="production"
+            ENVIRONMENT_SHORT="prd"
+            ;;
+          *)
+            case "$$RAW_ENV" in
+              dev|development)
+                ENVIRONMENT="development"
+                ENVIRONMENT_SHORT="dev"
+                ;;
+              prd|prod|production)
+                ENVIRONMENT="production"
+                ENVIRONMENT_SHORT="prd"
+                ;;
+              stg|stage|staging|*)
+                ENVIRONMENT="staging"
+                ENVIRONMENT_SHORT="stg"
+                ;;
+            esac
+            ;;
+        esac
+
+        ENV_FILE="environments/$${ENVIRONMENT}.tfvars"
+        TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
+        if [ -z "$$TARGET_PROJECT_ID" ] && [ -f "$$ENV_FILE" ]; then
+          TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$ENV_FILE" | head -n 1)
+        fi
+
+        STATE_BUCKET="${_STATE_BUCKET}"
+        if [ -z "$$STATE_BUCKET" ]; then
+          STATE_BUCKET="gcs-$${TARGET_PROJECT_ID}-tfstate"
+        fi
+        UDP_STATE_PREFIX="${_UDP_STATE_PREFIX}"
+
+        echo "ENVIRONMENT=$$ENVIRONMENT" > .env.udp.build
+        echo "ENV_FILE=$$ENV_FILE" >> .env.udp.build
+        echo "TARGET_PROJECT_ID=$$TARGET_PROJECT_ID" >> .env.udp.build
+        echo "STATE_BUCKET=$$STATE_BUCKET" >> .env.udp.build
+        echo "UDP_STATE_PREFIX=$$UDP_STATE_PREFIX" >> .env.udp.build
+
+        terraform init -reconfigure \
+          -backend-config="bucket=$$STATE_BUCKET" \
+          -backend-config="prefix=$$UDP_STATE_PREFIX"
+    dir: 'infra/udp'
+
+  # 2. Validate & Plan (infra/udp/)
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        . ./.env.udp.build
+        terraform validate
+        terraform plan \
+          -out=tfplan \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT"
+    dir: 'infra/udp'
+
+  # 3. Apply (infra/udp/)
+  - name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        . ./.env.udp.build
+        SHOULD_APPLY=false
+        if [ "${_TF_ACTION}" = "apply" ]; then
+          SHOULD_APPLY=true
+        elif [ "${_TF_ACTION}" = "plan" ]; then
+          SHOULD_APPLY=false
+        elif [ "${_TF_ACTION}" = "auto" ] || [ -z "${_TF_ACTION}" ]; then
+          if [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "stage" ] || [ "$BRANCH_NAME" = "staging" ] || [ -n "$TAG_NAME" ]; then
+            SHOULD_APPLY=true
+          fi
+        fi
+
+        if [ "$$SHOULD_APPLY" != "true" ]; then
+          echo "Skipping UDP terraform apply (planning only)."
+          exit 0
+        fi
+
+        terraform apply -auto-approve tfplan
+    dir: 'infra/udp'
+
+substitutions:
+  _TF_ACTION: 'auto'
+  _ENVIRONMENT: 'staging'
+  _TARGET_PROJECT_ID: ''
+  _UDP_STATE_PREFIX: 'terraform/udp/state'
+  _STATE_BUCKET: ''
+  _REGION: 'us-central1'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
