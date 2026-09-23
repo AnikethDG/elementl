@@ -91,7 +91,7 @@ resource "google_composer_environment" "udp_composer" {
       }
       triggerer {
         cpu       = 0.5
-        memory_gb = 1
+        memory_gb = 2
         count     = 1
       }
     }
