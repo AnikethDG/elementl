@@ -1,10 +1,10 @@
 {
-  "gcp_project_id": "pid-nse-dev-core-apps-dz09",
+  "gcp_project_id": "elementl-2",
   "gcp_region": "us-central1",
   "environment": "dev",
   "static_nat_ip": "136.112.137.11",
-  "raw_landing_bucket": "bkt-pid-nse-dev-core-apps-dz09-udp-bronze-raw",
-  "archive_bucket": "bkt-pid-nse-dev-core-apps-dz09-udp-bronze-archive",
+  "raw_landing_bucket": "bkt-elementl-2-udp-bronze-raw",
+  "archive_bucket": "bkt-elementl-2-udp-bronze-archive",
   "p6_schema": "ELEMENTL_PMDB_SBOX_PXRPTUSER",
   "dataform_repository": "gcp-dataform-transformations",
   "dataform_workspace": "dev",

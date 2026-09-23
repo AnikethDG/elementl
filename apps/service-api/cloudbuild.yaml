@@ -152,7 +152,7 @@ steps:
 substitutions:
   _ACTION: 'auto'               # 'auto' (pushes/deploys on main/tag, builds & tests on PRs), or 'test' / 'deploy'
   _ENVIRONMENT: 'development'   # 'development', 'staging', 'production'
-  _TARGET_PROJECT_ID: ''        # Auto-detected from infra/environments/<env>.tfvars if empty
+  _TARGET_PROJECT_ID: 'elementl-2' # Auto-detected from infra/environments/<env>.tfvars if empty
   _REGION: 'us-central1'
   _ARTIFACT_REPO: 'app-repo'
   _SERVICE_NAME: 'service-api'

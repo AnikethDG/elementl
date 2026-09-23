@@ -41,4 +41,4 @@ steps:
       - '--project=${_TARGET_PROJECT_ID}'
 substitutions:
   _REGION: 'us-central1'
-  _TARGET_PROJECT_ID: 'pid-nse-stg-core-apps-k8ti'
+  _TARGET_PROJECT_ID: 'elementl-2'

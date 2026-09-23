@@ -13,9 +13,9 @@
 # limitations under the License.
 
 variable "project_id" {
-  description = "Consolidated GCP Project ID (e.g. pid-nse-stg-core-apps-k8ti)"
+  description = "Consolidated GCP Project ID (e.g. elementl-2)"
   type        = string
-  default     = "pid-nse-stg-core-apps-k8ti"
+  default     = "elementl-2"
 }
 
 variable "region" {

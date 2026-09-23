@@ -1,5 +1,5 @@
 # Project Configuration
-project_id         = "p-nsedusc1-core-app-fe-01-irzf"
+project_id         = "elementl-2"
 region             = "us-central1"
 artifact_repo_name = "app-repo"
 

@@ -14,6 +14,10 @@ steps:
       - |
         RAW_ENV="${_ENVIRONMENT}"
         case "$PROJECT_ID" in
+          elementl-2)
+            ENVIRONMENT="development"
+            ENVIRONMENT_SHORT="dev"
+            ;;
           *dev*)
             ENVIRONMENT="development"
             ENVIRONMENT_SHORT="dev"
@@ -107,8 +111,8 @@ steps:
 
 substitutions:
   _TF_ACTION: 'auto'
-  _ENVIRONMENT: 'staging'
-  _TARGET_PROJECT_ID: ''
+  _ENVIRONMENT: 'development'
+  _TARGET_PROJECT_ID: 'elementl-2'
   _UDP_STATE_PREFIX: 'terraform/udp/state'
   _STATE_BUCKET: ''
   _REGION: 'us-central1'

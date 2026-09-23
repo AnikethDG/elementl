@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project_id                = "pid-nse-dev-core-apps-dz09"
+project_id                = "elementl-2"
 region                    = "us-central1"
 environment               = "development"
-vpc_network               = "projects/pid-ns-npd-us-netw-ucyd/global/networks/vpc-ns-dev-us"
-vpc_subnet                = "projects/pid-ns-npd-us-netw-ucyd/regions/us-central1/subnetworks/sub-ns-dev-usc1"
+vpc_network               = "projects/elementl-2/global/networks/default"
+vpc_subnet                = "projects/elementl-2/regions/us-central1/subnetworks/default"
 artifact_registry_repo_id = "udp-ingestion-jobs"
 image_tag                 = "latest"
 enable_composer           = true

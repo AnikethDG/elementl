@@ -1,0 +1,245 @@
+# ==============================================================================
+# Cloud Build Pipeline: Full Infrastructure Deployment (Root infra/ + infra/udp/)
+# ==============================================================================
+# - Pull Request Triggers: Runs 'terraform plan' for both root infra & UDP infra
+# - Main Merge / Push Triggers: Runs 'terraform plan' followed by 'terraform apply'
+# ==============================================================================
+
+steps:
+  # ----------------------------------------------------------------------------
+  # 1. Resolve Environment & Target Project
+  # ----------------------------------------------------------------------------
+  - id: 'resolve-env'
+    name: 'bash'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        case "$PROJECT_ID" in
+          elementl-2)
+            ENVIRONMENT="development"
+            ENVIRONMENT_SHORT="dev"
+            TARGET_PROJECT_ID="elementl-2"
+            ;;
+          *dev*)
+            ENVIRONMENT="development"
+            ENVIRONMENT_SHORT="dev"
+            TARGET_PROJECT_ID="elementl-2"
+            ;;
+          *stg*)
+            ENVIRONMENT="staging"
+            ENVIRONMENT_SHORT="stg"
+            TARGET_PROJECT_ID="pid-nse-stg-core-apps-k8ti"
+            ;;
+          *prd*)
+            ENVIRONMENT="production"
+            ENVIRONMENT_SHORT="prd"
+            TARGET_PROJECT_ID="pid-nse-prd-core-apps-6aw8"
+            ;;
+          *)
+            RAW_ENV="${_ENVIRONMENT}"
+            case "$$RAW_ENV" in
+              stg|stage|staging)
+                ENVIRONMENT="staging"
+                ENVIRONMENT_SHORT="stg"
+                ;;
+              prd|prod|production)
+                ENVIRONMENT="production"
+                ENVIRONMENT_SHORT="prd"
+                ;;
+              dev|development|*)
+                ENVIRONMENT="development"
+                ENVIRONMENT_SHORT="dev"
+                ;;
+            esac
+            TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
+            if [ -z "$$TARGET_PROJECT_ID" ]; then
+              TARGET_PROJECT_ID="elementl-2"
+            fi
+            ;;
+        esac
+
+        STATE_BUCKET="${_STATE_BUCKET}"
+        if [ -z "$$STATE_BUCKET" ]; then
+          STATE_BUCKET="gcs-$${TARGET_PROJECT_ID}-tfstate"
+        fi
+
+        echo "ENVIRONMENT=$$ENVIRONMENT" > /workspace/.env.build
+        echo "ENVIRONMENT_SHORT=$$ENVIRONMENT_SHORT" >> /workspace/.env.build
+        echo "TARGET_PROJECT_ID=$$TARGET_PROJECT_ID" >> /workspace/.env.build
+        echo "STATE_BUCKET=$$STATE_BUCKET" >> /workspace/.env.build
+
+        echo "=================================================================="
+        echo "Resolved Environment: $$ENVIRONMENT ($$ENVIRONMENT_SHORT)"
+        echo "Target Project: $$TARGET_PROJECT_ID | State Bucket: $$STATE_BUCKET"
+        echo "=================================================================="
+
+  # ----------------------------------------------------------------------------
+  # 2. Root Infrastructure (infra/) - Terraform Init
+  # ----------------------------------------------------------------------------
+  - id: 'init-root-infra'
+    name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        . /workspace/.env.build
+        echo "=================================================================="
+        echo "Initializing Root Terraform (infra/) for: $$ENVIRONMENT"
+        echo "=================================================================="
+        terraform init -reconfigure -lock=false \
+          -backend-config="bucket=$$STATE_BUCKET" \
+          -backend-config="prefix=terraform/infra/state"
+    dir: 'infra'
+
+  # ----------------------------------------------------------------------------
+  # 3. Root Infrastructure (infra/) - Terraform Plan
+  # ----------------------------------------------------------------------------
+  - id: 'plan-root-infra'
+    name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        . /workspace/.env.build
+        ENV_FILE="environments/$${ENVIRONMENT}.tfvars"
+        echo "=================================================================="
+        echo "Running Root Terraform Plan (infra/) using: $$ENV_FILE"
+        echo "=================================================================="
+        terraform plan -lock=false \
+          -out=tfplan \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT" || \
+        terraform plan -lock=false -refresh=false \
+          -out=tfplan \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT"
+    dir: 'infra'
+
+  # ----------------------------------------------------------------------------
+  # 4. Root Infrastructure (infra/) - Terraform Apply
+  # ----------------------------------------------------------------------------
+  - id: 'apply-root-infra'
+    name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        . /workspace/.env.build
+        SHOULD_APPLY=false
+        if [ "${_TF_ACTION}" = "apply" ]; then
+          SHOULD_APPLY=true
+        elif [ "${_TF_ACTION}" = "plan" ]; then
+          SHOULD_APPLY=false
+        elif [ "${_TF_ACTION}" = "auto" ] || [ -z "${_TF_ACTION}" ]; then
+          if [ "$BRANCH_NAME" = "main" ] || [ -n "$TAG_NAME" ]; then
+            SHOULD_APPLY=true
+          fi
+        fi
+
+        if [ "$$SHOULD_APPLY" != "true" ]; then
+          echo "=================================================================="
+          echo "Skipping root terraform apply (planning only)."
+          echo "Trigger details: BRANCH_NAME='$BRANCH_NAME', TAG_NAME='$TAG_NAME', _TF_ACTION='${_TF_ACTION}'"
+          echo "=================================================================="
+          exit 0
+        fi
+
+        echo "=================================================================="
+        echo "Applying Root Terraform plan (infra/) for $$ENVIRONMENT ($$TARGET_PROJECT_ID)"
+        echo "=================================================================="
+        terraform apply -auto-approve tfplan
+    dir: 'infra'
+
+  # ----------------------------------------------------------------------------
+  # 5. UDP Infrastructure (infra/udp/) - Terraform Init
+  # ----------------------------------------------------------------------------
+  - id: 'init-udp-infra'
+    name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        . /workspace/.env.build
+        echo "=================================================================="
+        echo "Initializing UDP Terraform (infra/udp/) for: $$ENVIRONMENT"
+        echo "=================================================================="
+        terraform init -reconfigure -lock=false \
+          -backend-config="bucket=$$STATE_BUCKET" \
+          -backend-config="prefix=terraform/udp/state"
+    dir: 'infra/udp'
+
+  # ----------------------------------------------------------------------------
+  # 6. UDP Infrastructure (infra/udp/) - Terraform Plan
+  # ----------------------------------------------------------------------------
+  - id: 'plan-udp-infra'
+    name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        . /workspace/.env.build
+        ENV_FILE="environments/$${ENVIRONMENT}.tfvars"
+        echo "=================================================================="
+        echo "Running UDP Terraform Plan (infra/udp/) using: $$ENV_FILE"
+        echo "=================================================================="
+        terraform plan -lock=false \
+          -out=tfplan \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT" || \
+        terraform plan -lock=false -refresh=false \
+          -out=tfplan \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT"
+    dir: 'infra/udp'
+
+  # ----------------------------------------------------------------------------
+  # 7. UDP Infrastructure (infra/udp/) - Terraform Apply
+  # ----------------------------------------------------------------------------
+  - id: 'apply-udp-infra'
+    name: 'hashicorp/terraform:1.5'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        . /workspace/.env.build
+        SHOULD_APPLY=false
+        if [ "${_TF_ACTION}" = "apply" ]; then
+          SHOULD_APPLY=true
+        elif [ "${_TF_ACTION}" = "plan" ]; then
+          SHOULD_APPLY=false
+        elif [ "${_TF_ACTION}" = "auto" ] || [ -z "${_TF_ACTION}" ]; then
+          if [ "$BRANCH_NAME" = "main" ] || [ -n "$TAG_NAME" ]; then
+            SHOULD_APPLY=true
+          fi
+        fi
+
+        if [ "$$SHOULD_APPLY" != "true" ]; then
+          echo "=================================================================="
+          echo "Skipping UDP terraform apply (planning only)."
+          echo "Trigger details: BRANCH_NAME='$BRANCH_NAME', TAG_NAME='$TAG_NAME', _TF_ACTION='${_TF_ACTION}'"
+          echo "=================================================================="
+          exit 0
+        fi
+
+        echo "=================================================================="
+        echo "Applying UDP Terraform plan (infra/udp/) for $$ENVIRONMENT ($$TARGET_PROJECT_ID)"
+        echo "=================================================================="
+        terraform apply -auto-approve tfplan
+    dir: 'infra/udp'
+
+substitutions:
+  _TF_ACTION: 'auto'
+  _ENVIRONMENT: 'development'
+  _TARGET_PROJECT_ID: 'elementl-2'
+  _STATE_BUCKET: ''
+  _REGION: 'us-central1'
+
+timeout: '3600s'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

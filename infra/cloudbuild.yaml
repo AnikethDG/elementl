@@ -13,10 +13,15 @@ steps:
       - '-c'
       - |
         case "$PROJECT_ID" in
+          elementl-2)
+            ENVIRONMENT="development"
+            ENVIRONMENT_SHORT="dev"
+            TARGET_PROJECT_ID="elementl-2"
+            ;;
           *dev*)
             ENVIRONMENT="development"
             ENVIRONMENT_SHORT="dev"
-            TARGET_PROJECT_ID="pid-nse-dev-core-apps-dz09"
+            TARGET_PROJECT_ID="elementl-2"
             ;;
           *stg*)
             ENVIRONMENT="staging"
@@ -128,7 +133,7 @@ steps:
 substitutions:
   _TF_ACTION: 'auto'
   _ENVIRONMENT: 'development'
-  _TARGET_PROJECT_ID: ''
+  _TARGET_PROJECT_ID: 'elementl-2'
   _STATE_PREFIX: 'terraform/infra/state'
   _UDP_STATE_PREFIX: 'terraform/udp/state'
   _STATE_BUCKET: ''

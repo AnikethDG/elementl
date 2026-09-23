@@ -86,7 +86,7 @@ images:
 
 substitutions:
   _REGION: 'us-central1'
-  _TARGET_PROJECT_ID: 'pid-nse-stg-core-apps-k8ti'
+  _TARGET_PROJECT_ID: 'elementl-2'
   _REPOSITORY: 'udp-ingestion-jobs'
   _TAG: 'latest'
 
