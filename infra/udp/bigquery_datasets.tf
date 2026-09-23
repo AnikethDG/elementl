@@ -12,14 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Consolidated Project BigQuery Ingestion Datasets & Operational Tables
+# Consolidated Project BigQuery Datasets (Bronze, Silver, Gold, Assertions & Operations)
 locals {
   udp_datasets = {
-    # Ingestion (Bronze Landing) & Ingestion Operational Metadata Datasets Only
+    # Ingestion (Bronze Landing) Datasets
     ds_bronze_oracle_p6 = "Bronze raw landing dataset for Oracle Primavera P6 (ELEMENTL_PMDB_SBOX_PXRPTUSER)"
     ds_bronze_netsuite  = "Bronze raw landing dataset for Oracle NetSuite (SuiteQL 11 tables)"
     ds_bronze_atlas     = "Bronze raw landing dataset for Atlas GIS & Tabular (envelope schema + layers)"
-    ds_operations       = "Operational metadata dataset driving DAG Factory, watermarks, and ingestion execution logs"
+    # Transformation (Silver, Gold & Dataform Assertions) Datasets
+    ds_silver_oracle_p6    = "Silver cleansed & standardized dataset for Oracle Primavera P6"
+    ds_silver_netsuite     = "Silver cleansed & standardized dataset for Oracle NetSuite"
+    ds_silver_atlas        = "Silver cleansed & standardized dataset for Atlas GIS & Tabular"
+    ds_gold                = "Gold analytics & reporting dataset across UDP sources"
+    ds_dataform_assertions = "Dataform data quality assertion results dataset"
+    # Operational Metadata Dataset
+    ds_operations = "Operational metadata dataset driving DAG Factory, watermarks, and ingestion execution logs"
   }
 }
 

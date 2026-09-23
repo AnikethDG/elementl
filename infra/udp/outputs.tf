@@ -42,7 +42,7 @@ output "udp_cloud_run_jobs" {
   value       = { for k, j in google_cloud_run_v2_job.udp_ingestion_jobs : k => j.id }
 }
 
-output "udp_job_service_accounts" {
-  description = "Dedicated service accounts for Cloud Run Ingestion Jobs"
-  value       = { for k, sa in google_service_account.udp_job_sa : k => sa.email }
+output "udp_platform_service_accounts" {
+  description = "Platform service accounts for UDP Ingestion, Transformation (Dataform), and Orchestration (Composer)"
+  value       = { for k, sa in google_service_account.udp_platform_sas : k => sa.email }
 }
