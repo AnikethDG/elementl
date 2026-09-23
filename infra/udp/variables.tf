@@ -65,3 +65,9 @@ variable "composer_image_version" {
   type        = string
   default     = "composer-3-airflow-3"
 }
+
+variable "dataform_git_url" {
+  description = "Git HTTPS repository URL for Dataform SQLX transformations."
+  type        = string
+  default     = "https://github.com/Elementl-Power/gcp-dataform-transformations.git"
+}

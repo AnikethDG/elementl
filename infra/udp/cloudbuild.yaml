@@ -112,5 +112,7 @@ substitutions:
   _STATE_BUCKET: ''
   _REGION: 'us-central1'
 
+timeout: '3600s'
+
 options:
   logging: CLOUD_LOGGING_ONLY

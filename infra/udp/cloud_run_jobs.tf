@@ -53,45 +53,22 @@ locals {
       bronze_dataset  = "ds_bronze_oracle_p6"
       silver_dataset  = "ds_silver_oracle_p6"
     }
+    "spatial-data-unpacker" = {
+      description     = "Atlas shapefile/zip download unpacker for spatial data (apps/udp/cloud-run-jobs/spatial-data-unpacker)"
+      dockerfile_path = "apps/udp/cloud-run-jobs/spatial-data-unpacker/Dockerfile"
+      cpu             = "2"
+      memory          = "4Gi"
+      source_type     = "SPATIAL_DATA"
+      bronze_dataset  = "ds_bronze_atlas"
+      silver_dataset  = "ds_silver_atlas"
+    }
   }
-
-  netsuite_secret_ids = toset([
-    "secret-netsuite-config",
-    "secret-netsuite-api-config",
-    "secret-netsuite-account-id",
-    "secret-netsuite-client-id",
-    "secret-netsuite-certificate-id",
-    "secret-netsuite-scope",
-    "secret-netsuite-private-key",
-  ])
-}
-
-resource "google_service_account" "udp_job_sa" {
-  for_each     = local.ingestion_jobs
-  project      = var.project_id
-  account_id   = substr("sa-${each.key}", 0, 28)
-  display_name = "UDP Runtime SA for ${each.key}"
-  description  = "Dedicated least-privilege service account for Cloud Run Job ${each.key}"
-}
-
-resource "google_storage_bucket_iam_member" "udp_job_raw_bucket_access" {
-  for_each = local.ingestion_jobs
-  bucket   = google_storage_bucket.udp_bronze_raw.name
-  role     = "roles/storage.objectAdmin"
-  member   = "serviceAccount:${google_service_account.udp_job_sa[each.key].email}"
-}
-
-resource "google_storage_bucket_iam_member" "udp_job_staging_bucket_access" {
-  for_each = local.ingestion_jobs
-  bucket   = google_storage_bucket.udp_landing_staging.name
-  role     = "roles/storage.objectAdmin"
-  member   = "serviceAccount:${google_service_account.udp_job_sa[each.key].email}"
 }
 
 resource "google_cloud_run_v2_job" "udp_ingestion_jobs" {
   depends_on = [
     google_artifact_registry_repository.udp_ingestion_repo,
-    google_artifact_registry_repository_iam_member.udp_job_sa_repo_reader,
+    google_artifact_registry_repository_iam_member.udp_ingest_platform_sa_repo_writer,
   ]
   for_each = local.ingestion_jobs
   project  = var.project_id
@@ -100,7 +77,7 @@ resource "google_cloud_run_v2_job" "udp_ingestion_jobs" {
 
   template {
     template {
-      service_account = google_service_account.udp_job_sa[each.key].email
+      service_account = google_service_account.udp_platform_sas["gcp-sa-nsedusc1-data-ingest"].email
       max_retries     = 2
       timeout         = "3600s"
 
@@ -188,7 +165,7 @@ resource "google_cloud_run_v2_job" "udp_ingestion_jobs" {
   }
 }
 
-# Allow Cloud Composer 3 SA to execute the 4 Cloud Run Jobs via CloudRunExecuteJobOperator
+# Allow Cloud Composer 3 SA to execute all Cloud Run Jobs via CloudRunExecuteJobOperator
 resource "google_cloud_run_v2_job_iam_member" "composer_run_invoker" {
   for_each = local.ingestion_jobs
   project  = var.project_id
@@ -196,59 +173,4 @@ resource "google_cloud_run_v2_job_iam_member" "composer_run_invoker" {
   name     = google_cloud_run_v2_job.udp_ingestion_jobs[each.key].name
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.udp_platform_sas["gcp-sa-nsedusc1-composer"].email}"
-}
-
-# Resource-Level Least-Privilege IAM (Compensating Control: No Project-Level Data Roles)
-resource "google_secret_manager_secret_iam_member" "jdbc_p6_config_access" {
-  project   = var.project_id
-  secret_id = google_secret_manager_secret.udp_secrets["secret-p6-db-config"].secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.udp_job_sa["jdbc-ingestion"].email}"
-}
-
-resource "google_secret_manager_secret_iam_member" "jdbc_p6_ca_access" {
-  project   = var.project_id
-  secret_id = google_secret_manager_secret.udp_secrets["secret-p6-db-ca-bundle"].secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.udp_job_sa["jdbc-ingestion"].email}"
-}
-
-resource "google_bigquery_dataset_iam_member" "jdbc_p6_raw_dataset_access" {
-  for_each   = toset(["ds_bronze_oracle_p6", "ds_operations"])
-  project    = var.project_id
-  dataset_id = google_bigquery_dataset.datasets[each.key].dataset_id
-  role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${google_service_account.udp_job_sa["jdbc-ingestion"].email}"
-}
-
-resource "google_secret_manager_secret_iam_member" "suiteql_netsuite_secrets_access" {
-  for_each  = local.netsuite_secret_ids
-  project   = var.project_id
-  secret_id = google_secret_manager_secret.udp_secrets[each.key].secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.udp_job_sa["suiteql-ingestion"].email}"
-}
-
-resource "google_bigquery_dataset_iam_member" "suiteql_netsuite_raw_dataset_access" {
-  for_each   = toset(["ds_bronze_netsuite", "ds_operations"])
-  project    = var.project_id
-  dataset_id = google_bigquery_dataset.datasets[each.key].dataset_id
-  role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${google_service_account.udp_job_sa["suiteql-ingestion"].email}"
-}
-
-resource "google_bigquery_dataset_iam_member" "arcgis_atlas_raw_dataset_access" {
-  for_each   = toset(["ds_bronze_atlas", "ds_operations"])
-  project    = var.project_id
-  dataset_id = google_bigquery_dataset.datasets[each.key].dataset_id
-  role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${google_service_account.udp_job_sa["arcgis-ingestion"].email}"
-}
-
-resource "google_bigquery_dataset_iam_member" "bulk_atlas_raw_dataset_access" {
-  for_each   = toset(["ds_bronze_atlas", "ds_operations"])
-  project    = var.project_id
-  dataset_id = google_bigquery_dataset.datasets[each.key].dataset_id
-  role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${google_service_account.udp_job_sa["bulk-ingestion"].email}"
 }

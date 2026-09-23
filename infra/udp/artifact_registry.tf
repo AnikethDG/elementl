@@ -13,11 +13,13 @@
 # limitations under the License.
 
 # Dedicated Docker Artifact Registry for UDP Cloud Run Jobs (apps/udp/cloud-run-jobs/*)
-# Stores the 4 container images built from apps/udp/cloud-run-jobs/:
+# Stores the 5 container images built from apps/udp/cloud-run-jobs/:
 #   1. arcgis-ingestion  (apps/udp/cloud-run-jobs/arcgis-ingestion/Dockerfile)
 #   2. bulk-ingestion    (apps/udp/cloud-run-jobs/bulk-ingestion/Dockerfile)
 #   3. jdbc-ingestion    (apps/udp/cloud-run-jobs/jdbc-ingestion/Dockerfile)
 #   4. suiteql-ingestion (apps/udp/cloud-run-jobs/suiteQL-ingestion/Dockerfile)
+#   5. spatial-data-unpacker  (apps/udp/cloud-run-jobs/spatial-data-unpacker/Dockerfile)
+
 resource "google_artifact_registry_repository" "udp_ingestion_repo" {
   depends_on    = [google_project_service.udp_apis]
   project       = var.project_id
@@ -35,17 +37,7 @@ resource "google_artifact_registry_repository" "udp_ingestion_repo" {
   }
 }
 
-# Repository-level IAM: Grant pull (reader) access to each Cloud Run Job runtime SA
-resource "google_artifact_registry_repository_iam_member" "udp_job_sa_repo_reader" {
-  for_each   = local.ingestion_jobs
-  project    = var.project_id
-  location   = google_artifact_registry_repository.udp_ingestion_repo.location
-  repository = google_artifact_registry_repository.udp_ingestion_repo.name
-  role       = "roles/artifactregistry.reader"
-  member     = "serviceAccount:${google_service_account.udp_job_sa[each.key].email}"
-}
-
-# Repository-level IAM: Grant push (writer) access to the UDP Ingestion Platform SA
+# Repository-level IAM: Grant pull & push (writer) access to the UDP Ingestion Platform SA (gcp-sa-nsedusc1-data-ingest)
 resource "google_artifact_registry_repository_iam_member" "udp_ingest_platform_sa_repo_writer" {
   project    = var.project_id
   location   = google_artifact_registry_repository.udp_ingestion_repo.location

@@ -28,33 +28,43 @@ resource "google_service_account" "udp_platform_sas" {
   display_name = each.value
 }
 
+# Grant Cloud Composer 3 Node Service Account required roles/composer.worker
+resource "google_project_iam_member" "composer_worker" {
+  project = var.project_id
+  role    = "roles/composer.worker"
+  member  = "serviceAccount:${google_service_account.udp_platform_sas["gcp-sa-nsedusc1-composer"].email}"
+}
+
 # Cloud Composer 3 Environment (Small Instance, Composer 3 + Airflow 3, Private IP)
 resource "google_composer_environment" "udp_composer" {
-  count   = var.enable_composer ? 1 : 0
-  project = var.project_id
-  name    = "composer-elementl-udp-${var.environment}"
-  region  = var.region
+  depends_on = [google_project_iam_member.composer_worker]
+  count      = var.enable_composer ? 1 : 0
+  project    = var.project_id
+  name       = "composer-elementl-udp-${var.environment}"
+  region     = var.region
 
   config {
     software_config {
       image_version = var.composer_image_version
 
-      pypi_packages = {
-        "oracledb"     = ""
-        "pyarrow"      = ""
-        "cryptography" = ""
-        "PyJWT"        = ""
-      }
+      #pypi_packages = {
+      #  "oracledb"     = ""
+      #  "pyarrow"      = ""
+      #  "cryptography" = ""
+      #  "PyJWT"        = ""
+      #}
 
       env_variables = {
-        GCP_PROJECT_ID         = var.project_id
-        GCP_REGION             = var.region
-        ENVIRONMENT            = var.environment
-        RAW_BUCKET_NAME        = google_storage_bucket.udp_bronze_raw.name
-        ARCHIVE_BUCKET_NAME    = google_storage_bucket.udp_bronze_archive.name
-        STAGING_BUCKET_NAME    = google_storage_bucket.udp_landing_staging.name
-        DATAFLOW_TEMP_BUCKET   = google_storage_bucket.udp_dataflow_temp.name
-        DATAFORM_REPOSITORY_ID = "gcp-dataform-transformations"
+        GCP_PROJECT_ID           = var.project_id
+        GCP_REGION               = var.region
+        ENVIRONMENT              = var.environment
+        RAW_BUCKET_NAME          = google_storage_bucket.udp_bronze_raw.name
+        ARCHIVE_BUCKET_NAME      = google_storage_bucket.udp_bronze_archive.name
+        STAGING_BUCKET_NAME      = google_storage_bucket.udp_landing_staging.name
+        DATAFLOW_TEMP_BUCKET     = google_storage_bucket.udp_dataflow_temp.name
+        DATAFORM_REPOSITORY_ID   = "gcp-dataform-transformations"
+        DATAFORM_REPOSITORY      = "gcp-dataform-transformations"
+        DATAFORM_SERVICE_ACCOUNT = google_service_account.udp_platform_sas["gcp-sa-nsedusc1-data-transform"].email
       }
     }
 
