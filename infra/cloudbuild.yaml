@@ -86,8 +86,26 @@ steps:
           -var-file="$$ENV_FILE" \
           -var="region=$_REGION" \
           -var="environment=$$ENVIRONMENT"; then
-          sleep 25
-          exit 1
+          echo "Retrying plan with -refresh=false..."
+          ERR=$$(terraform plan -lock=false -refresh=false \
+            -out=tfplan \
+            -var-file="$$ENV_FILE" \
+            -var="region=$_REGION" \
+            -var="environment=$$ENVIRONMENT" 2>&1) || {
+            echo "$$ERR"
+            case "$$ERR" in
+              *snapshot*|*version*|*state*)
+                sleep 15
+                ;;
+              *var*|*argument*|*undeclared*)
+                sleep 30
+                ;;
+              *)
+                sleep 45
+                ;;
+            esac
+            exit 1
+          }
         fi
     dir: 'infra'
 
