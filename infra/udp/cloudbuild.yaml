@@ -72,6 +72,7 @@ steps:
         . ./.env.udp.build
         terraform validate
         terraform plan \
+          -lock=false \
           -out=tfplan \
           -var-file="$$ENV_FILE" \
           -var="region=$_REGION" \
