@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Core App Infrastructure GCS State Backend (Isolated from UDP State)
-# State path: gs://gcs-<project_id>-tfstate/terraform/infra/state/default.tfstate
-terraform {
-  backend "gcs" {
-    prefix = "terraform/infra/state"
-  }
-}
+# NOTE ON TERRAFORM STATE SEPARATION:
+# Root `infra/` manages the core application Artifact Registry (`app-repo` in `infra/main.tf`)
+# under state prefix `terraform/infra/state`.
+# The UDP Docker Artifact Registry (`udp-ingestion-jobs`) and its Cloud Run Job IAM bindings
+# are managed exclusively in `infra/udp/artifact_registry.tf` under the isolated UDP state
+# prefix `terraform/udp/state` to prevent cross-state 409 resource collisions.
