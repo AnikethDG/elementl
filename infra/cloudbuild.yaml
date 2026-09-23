@@ -13,40 +13,63 @@ steps:
       - '-c'
       - |
         RAW_ENV="${_ENVIRONMENT}"
-        case "$$RAW_ENV" in
-          stg|staging)
+        case "$PROJECT_ID" in
+          *dev*)
+            ENVIRONMENT="development"
+            ENVIRONMENT_SHORT="dev"
+            ;;
+          *stg*)
             ENVIRONMENT="staging"
             ENVIRONMENT_SHORT="stg"
             ;;
-          prd|prod|production)
+          *prd*)
             ENVIRONMENT="production"
             ENVIRONMENT_SHORT="prd"
             ;;
-          dev|development|*)
-            ENVIRONMENT="development"
-            ENVIRONMENT_SHORT="dev"
+          *)
+            case "$$RAW_ENV" in
+              stg|staging)
+                ENVIRONMENT="staging"
+                ENVIRONMENT_SHORT="stg"
+                ;;
+              prd|prod|production)
+                ENVIRONMENT="production"
+                ENVIRONMENT_SHORT="prd"
+                ;;
+              dev|development|*)
+                ENVIRONMENT="development"
+                ENVIRONMENT_SHORT="dev"
+                ;;
+            esac
             ;;
         esac
 
         ENV_FILE="environments/$${ENVIRONMENT}.tfvars"
         if [ ! -f "$$ENV_FILE" ]; then
-          echo "ERROR: Environment file '$$ENV_FILE' does not exist! Valid environments are development, staging, production." >&2
+          echo "Error: Environment tfvars file '$$ENV_FILE' not found!"
           exit 1
         fi
 
-        # Extract project_id from tfvars
-        TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
-        if [ -z "$$TARGET_PROJECT_ID" ] && [ -f "$$ENV_FILE" ]; then
-          TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$ENV_FILE" | head -n 1)
+        # Extract project_id from the environment tfvars file if not explicitly passed
+        if [ -n "${_TARGET_PROJECT_ID}" ]; then
+          TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
+        else
+          TARGET_PROJECT_ID=$$(grep -E '^[[:space:]]*project_id[[:space:]]*=' "$$ENV_FILE" | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/' | tr -d '[:space:]')
         fi
 
         if [ -z "$$TARGET_PROJECT_ID" ]; then
-          echo "ERROR: Unable to resolve TARGET_PROJECT_ID from '$$ENV_FILE' for environment '${_ENVIRONMENT}'!" >&2
+          echo "Error: Could not determine TARGET_PROJECT_ID from $$ENV_FILE or _TARGET_PROJECT_ID"
           exit 1
         fi
 
-        STATE_BUCKET="${_STATE_BUCKET:-gcs-$${TARGET_PROJECT_ID}-tfstate}"
-        STATE_PREFIX="${_STATE_PREFIX:-terraform/infra/state}"
+        STATE_BUCKET="${_STATE_BUCKET}"
+        if [ -z "$$STATE_BUCKET" ]; then
+          STATE_BUCKET="gcs-$${TARGET_PROJECT_ID}-tfstate"
+        fi
+        STATE_PREFIX="${_STATE_PREFIX}"
+        if [ -z "$$STATE_PREFIX" ]; then
+          STATE_PREFIX="terraform/infra/state"
+        fi
 
         # Persist context for subsequent steps
         echo "ENVIRONMENT=$$ENVIRONMENT" > .env.build
@@ -127,5 +150,3 @@ substitutions:
 
 options:
   logging: CLOUD_LOGGING_ONLY
-
-
