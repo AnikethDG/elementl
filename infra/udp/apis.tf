@@ -23,7 +23,6 @@ locals {
     "iam.googleapis.com",
     "run.googleapis.com",
     "secretmanager.googleapis.com",
-    "sourcemanager.googleapis.com",
     "storage.googleapis.com",
   ])
 }
