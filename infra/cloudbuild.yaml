@@ -81,32 +81,16 @@ steps:
         echo "=================================================================="
         echo "Running Root Terraform Plan (infra/) using: $$ENV_FILE"
         echo "=================================================================="
-        if ! terraform plan -lock=false \
+        terraform plan -lock=false \
           -out=tfplan \
           -var-file="$$ENV_FILE" \
           -var="region=$_REGION" \
-          -var="environment=$$ENVIRONMENT"; then
-          echo "Retrying plan with -refresh=false..."
-          ERR=$$(terraform plan -lock=false -refresh=false \
-            -out=tfplan \
-            -var-file="$$ENV_FILE" \
-            -var="region=$_REGION" \
-            -var="environment=$$ENVIRONMENT" 2>&1) || {
-            echo "$$ERR"
-            case "$$ERR" in
-              *snapshot*|*version*|*state*)
-                sleep 15
-                ;;
-              *var*|*argument*|*undeclared*)
-                sleep 30
-                ;;
-              *)
-                sleep 45
-                ;;
-            esac
-            exit 1
-          }
-        fi
+          -var="environment=$$ENVIRONMENT" || \
+        terraform plan -lock=false -refresh=false \
+          -out=tfplan \
+          -var-file="$$ENV_FILE" \
+          -var="region=$_REGION" \
+          -var="environment=$$ENVIRONMENT"
     dir: 'infra'
 
   # 3. Terraform Apply (Runs ONLY on main branch push, tag push, or explicit _TF_ACTION=apply)
