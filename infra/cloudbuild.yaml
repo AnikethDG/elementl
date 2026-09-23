@@ -12,57 +12,46 @@ steps:
     args:
       - '-c'
       - |
-        RAW_ENV="${_ENVIRONMENT}"
         case "$PROJECT_ID" in
           *dev*)
             ENVIRONMENT="development"
             ENVIRONMENT_SHORT="dev"
+            TARGET_PROJECT_ID="pid-nse-dev-core-apps-dz09"
+            ;;
+          *stg*)
+            ENVIRONMENT="staging"
+            ENVIRONMENT_SHORT="stg"
+            TARGET_PROJECT_ID="pid-nse-stg-core-apps-k8ti"
             ;;
           *prd*)
             ENVIRONMENT="production"
             ENVIRONMENT_SHORT="prd"
+            TARGET_PROJECT_ID="pid-nse-prd-core-apps-6aw8"
             ;;
           *)
+            RAW_ENV="${_ENVIRONMENT}"
             case "$$RAW_ENV" in
-              dev|development)
-                ENVIRONMENT="development"
-                ENVIRONMENT_SHORT="dev"
+              stg|stage|staging)
+                ENVIRONMENT="staging"
+                ENVIRONMENT_SHORT="stg"
                 ;;
               prd|prod|production)
                 ENVIRONMENT="production"
                 ENVIRONMENT_SHORT="prd"
                 ;;
-              stg|stage|staging|*)
-                ENVIRONMENT="staging"
-                ENVIRONMENT_SHORT="stg"
+              dev|development|*)
+                ENVIRONMENT="development"
+                ENVIRONMENT_SHORT="dev"
                 ;;
             esac
+            ENV_FILE="environments/$${ENVIRONMENT}.tfvars"
+            TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$ENV_FILE" | head -n 1)
             ;;
         esac
 
         ENV_FILE="environments/$${ENVIRONMENT}.tfvars"
-        if [ ! -f "$$ENV_FILE" ]; then
-          echo "ERROR: Environment file '$$ENV_FILE' does not exist! Valid environments are development, staging, production." >&2
-          exit 1
-        fi
-
-        # Extract project_id from tfvars
-        TARGET_PROJECT_ID="${_TARGET_PROJECT_ID}"
-        if [ -z "$$TARGET_PROJECT_ID" ] && [ -f "$$ENV_FILE" ]; then
-          TARGET_PROJECT_ID=$$(sed -n 's/.*project_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$$ENV_FILE" | head -n 1)
-        fi
-
-        if [ -z "$$TARGET_PROJECT_ID" ]; then
-          echo "ERROR: Unable to resolve TARGET_PROJECT_ID from '$$ENV_FILE' for environment '${_ENVIRONMENT}'!" >&2
-          exit 1
-        fi
-
-        STATE_BUCKET="${_STATE_BUCKET}"
-        if [ -z "$$STATE_BUCKET" ]; then
-          STATE_BUCKET="gcs-$${TARGET_PROJECT_ID}-tfstate"
-        fi
-        STATE_PREFIX="${_STATE_PREFIX}"
-        UDP_STATE_PREFIX="${_UDP_STATE_PREFIX}"
+        STATE_BUCKET="gcs-$${TARGET_PROJECT_ID}-tfstate"
+        STATE_PREFIX="terraform/infra/state"
 
         # Persist context for subsequent steps
         echo "ENVIRONMENT=$$ENVIRONMENT" > .env.build
@@ -71,7 +60,6 @@ steps:
         echo "TARGET_PROJECT_ID=$$TARGET_PROJECT_ID" >> .env.build
         echo "STATE_BUCKET=$$STATE_BUCKET" >> .env.build
         echo "STATE_PREFIX=$$STATE_PREFIX" >> .env.build
-        echo "UDP_STATE_PREFIX=$$UDP_STATE_PREFIX" >> .env.build
 
         echo "=================================================================="
         echo "Initializing Root Terraform (infra/) for: $$ENVIRONMENT ($$ENVIRONMENT_SHORT)"
@@ -93,14 +81,17 @@ steps:
         echo "=================================================================="
         echo "Running Root Terraform Plan (infra/) using: $$ENV_FILE"
         echo "=================================================================="
-        terraform plan -lock=false \
+        if ! terraform plan -lock=false \
           -out=tfplan \
           -var-file="$$ENV_FILE" \
           -var="region=$_REGION" \
-          -var="environment=$$ENVIRONMENT"
+          -var="environment=$$ENVIRONMENT"; then
+          sleep 25
+          exit 1
+        fi
     dir: 'infra'
 
-  # 3. Terraform Apply (Runs ONLY on main/stage branch push, tag push, or explicit _TF_ACTION=apply)
+  # 3. Terraform Apply (Runs ONLY on main branch push, tag push, or explicit _TF_ACTION=apply)
   - name: 'hashicorp/terraform:1.5'
     entrypoint: 'sh'
     args:
@@ -113,7 +104,7 @@ steps:
         elif [ "${_TF_ACTION}" = "plan" ]; then
           SHOULD_APPLY=false
         elif [ "${_TF_ACTION}" = "auto" ] || [ -z "${_TF_ACTION}" ]; then
-          if [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "stage" ] || [ "$BRANCH_NAME" = "staging" ] || [ -n "$TAG_NAME" ]; then
+          if [ "$BRANCH_NAME" = "main" ] || [ -n "$TAG_NAME" ]; then
             SHOULD_APPLY=true
           fi
         fi
@@ -122,7 +113,6 @@ steps:
           echo "=================================================================="
           echo "Skipping terraform apply (planning only)."
           echo "Trigger details: BRANCH_NAME='$BRANCH_NAME', TAG_NAME='$TAG_NAME', _TF_ACTION='${_TF_ACTION}'"
-          echo "(Terraform apply executes only on 'main'/'stage' branch, tag push, or when _TF_ACTION='apply')"
           echo "=================================================================="
           exit 0
         fi
@@ -134,12 +124,12 @@ steps:
     dir: 'infra'
 
 substitutions:
-  _TF_ACTION: 'auto'              # 'auto' (applies on main/stage/tag, plans on PRs), or 'plan' / 'apply'
-  _ENVIRONMENT: 'staging'         # Default to non-sensitive stage GCP project (pid-nse-stg-core-apps-k8ti)
-  _TARGET_PROJECT_ID: ''          # Auto-detected from environments/<env>.tfvars if empty
+  _TF_ACTION: 'auto'
+  _ENVIRONMENT: 'development'
+  _TARGET_PROJECT_ID: ''
   _STATE_PREFIX: 'terraform/infra/state'
   _UDP_STATE_PREFIX: 'terraform/udp/state'
-  _STATE_BUCKET: ''               # Defaults to gcs-${TARGET_PROJECT_ID}-tfstate
+  _STATE_BUCKET: ''
   _REGION: 'us-central1'
 
 options:
