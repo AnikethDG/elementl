@@ -1,0 +1,34 @@
+config {
+  type: "table",
+  database: dataform.projectConfig.vars.udp_project,
+  schema: dataform.projectConfig.vars.silver_dataset,
+  name: "agg_netsuite_posting_daily",
+  description: "Daily posting totals per trandate / account / subsidiary from fct_netsuite_transaction_lines.",
+  tags: ["netsuite", "silver", "agg_netsuite_posting_daily"],
+  bigquery: {
+    partitionBy: "trandate",
+    clusterBy: ["account", "subsidiary"]
+  },
+  columns: {
+    debit_amount: "SUM of positive netamount",
+    credit_amount: "SUM of negative netamount (stored negative)",
+    _silver_loaded_at: "Run time of the silver load",
+    _silver_run_id: "dataform:<run_id var>"
+  },
+  assertions: {
+    uniqueKey: ["trandate", "account", "subsidiary"],
+    nonNull: ["trandate", "account", "subsidiary"]
+  }
+}
+
+SELECT
+  trandate,
+  account,
+  subsidiary,
+  COUNT(*) AS line_count,
+  SUM(netamount) AS total_net_amount,
+  SUM(IF(netamount > 0, netamount, 0)) AS debit_amount,
+  SUM(IF(netamount < 0, netamount, 0)) AS credit_amount,
+  ${netsuite.audit_columns()}
+FROM ${ref("fct_netsuite_transaction_lines")}
+GROUP BY trandate, account, subsidiary

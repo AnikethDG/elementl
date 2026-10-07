@@ -1,0 +1,18 @@
+# Dataform project settings for the UDP bronze-to-silver framework (NetSuite silver models).
+# Defaults target the ani-labs sandbox; the orchestrator overrides everything below at compile time
+# via workflowInvocation -> compilationResult.codeCompilationConfig (defaultDatabase/defaultSchema/
+# assertionSchema/defaultLocation and `vars`). See README.md for the exact payloads.
+defaultProject: ani-labs
+defaultLocation: us-central1
+defaultDataset: elementl_silver
+defaultAssertionDataset: elementl_silver_assertions
+dataformCoreVersion: 3.0.69
+
+vars:
+  # Parameters every engine receives (docs/CONVENTIONS.md).
+  udp_project: "ani-labs"
+  bronze_dataset: "elementl_bronze"
+  silver_dataset: "elementl_silver"
+  # Optional: orchestrator passes the Airflow run_id (or any correlation id). Written as
+  # `_silver_run_id = 'dataform:<run_id>'` on every silver row; defaults to 'dataform'.
+  run_id: "dataform"

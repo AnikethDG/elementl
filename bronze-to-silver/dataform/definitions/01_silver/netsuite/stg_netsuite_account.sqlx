@@ -1,0 +1,37 @@
+config {
+  type: "table",
+  database: dataform.projectConfig.vars.udp_project,
+  schema: dataform.projectConfig.vars.silver_dataset,
+  name: "stg_netsuite_account",
+  description: "1:1 silver conformed NetSuite account: latest bronze version per id, typed columns.",
+  tags: ["netsuite", "silver", "stg_netsuite_account"],
+  columns: {
+    id: "NetSuite internal id (business key, STRING)",
+    subsidiary_id: "id extracted from the bronze `subsidiary` JSON reference",
+    _silver_loaded_at: "Run time of the silver load",
+    _silver_run_id: "dataform:<run_id var>"
+  },
+  assertions: {
+    nonNull: ["id"],
+    uniqueKey: ["id"],
+    rowConditions: ["acctnumber IS NOT NULL"]
+  }
+}
+
+WITH latest AS (
+  ${netsuite.latest_version(ref(dataform.projectConfig.vars.bronze_dataset, "netsuite_account"), "id", "lastmodifieddate")}
+)
+
+SELECT
+  id,
+  acctnumber,
+  fullname,
+  accttype,
+  ${netsuite.tf_to_bool("isinactive")} AS isinactive,
+  CAST(parent AS STRING) AS parent,
+  ${netsuite.json_ref_id("subsidiary")} AS subsidiary_id,
+  ${netsuite.ns_timestamp("lastmodifieddate")} AS lastmodifieddate,
+  ingestion_date,
+  ingestion_timestamp,
+  ${netsuite.audit_columns()}
+FROM latest

@@ -1,0 +1,52 @@
+config {
+  type: "incremental",
+  database: dataform.projectConfig.vars.udp_project,
+  schema: dataform.projectConfig.vars.silver_dataset,
+  name: "stg_netsuite_transaction",
+  description: "Typed NetSuite transaction header, MERGEd on id. Incremental runs only read bronze rows ingested after the stored watermark MAX(_bronze_ingested_at).",
+  tags: ["netsuite", "silver", "stg_netsuite_transaction"],
+  uniqueKey: ["id"],
+  columns: {
+    id: "NetSuite internal id (business key, STRING)",
+    _bronze_ingested_at: "ingestion_timestamp of the bronze version that produced this row; MAX() is the incremental watermark",
+    _silver_loaded_at: "Run time of the silver load",
+    _silver_run_id: "dataform:<run_id var>"
+  },
+  assertions: {
+    uniqueKey: ["id"],
+    nonNull: ["id", "trandate"]
+  }
+}
+
+WITH src AS (
+  SELECT *
+  FROM ${ref(dataform.projectConfig.vars.bronze_dataset, "netsuite_transaction")}
+  WHERE id IS NOT NULL
+  ${when(incremental(),
+    `AND ingestion_timestamp > (
+      SELECT COALESCE(MAX(_bronze_ingested_at), TIMESTAMP '1970-01-01') FROM ${self()}
+    )`)}
+),
+
+latest AS (
+  ${netsuite.latest_version("src", "id", "lastmodifieddate")}
+)
+
+SELECT
+  id,
+  tranid,
+  type,
+  ${netsuite.ns_date("trandate")} AS trandate,
+  ${netsuite.ns_int("postingperiod")} AS postingperiod,
+  ${netsuite.tf_to_bool("posting")} AS posting,
+  entity,
+  currency,
+  subsidiary,
+  ${netsuite.ns_numeric("foreigntotal")} AS foreigntotal,
+  status,
+  memo,
+  ${netsuite.ns_timestamp("lastmodifieddate")} AS lastmodifieddate,
+  ingestion_date,
+  ingestion_timestamp AS _bronze_ingested_at,
+  ${netsuite.audit_columns()}
+FROM latest

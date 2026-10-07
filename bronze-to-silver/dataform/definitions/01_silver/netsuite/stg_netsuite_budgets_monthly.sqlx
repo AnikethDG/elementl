@@ -1,0 +1,61 @@
+config {
+  type: "table",
+  database: dataform.projectConfig.vars.udp_project,
+  schema: dataform.projectConfig.vars.silver_dataset,
+  name: "stg_netsuite_budgets_monthly",
+  description: "NetSuite budgets unpivoted from amount_1..amount_12 to one row per budget and month (NULL amounts dropped).",
+  tags: ["netsuite", "silver", "stg_netsuite_budgets_monthly"],
+  columns: {
+    budget_id: "netsuite_budgets.id",
+    month: "1..12 (fiscal month column index)",
+    period_start: "First day of the month: DATE(fiscal_year, month, 1)",
+    _silver_loaded_at: "Run time of the silver load",
+    _silver_run_id: "dataform:<run_id var>"
+  },
+  assertions: {
+    uniqueKey: ["budget_id", "month"],
+    nonNull: ["budget_id", "month", "budget_amount"]
+  }
+}
+
+WITH latest AS (
+  ${netsuite.latest_version(ref(dataform.projectConfig.vars.bronze_dataset, "netsuite_budgets"), "id", "lastmodifieddate")}
+),
+
+unpivoted AS (
+  SELECT
+    id AS budget_id,
+    account,
+    department,
+    subsidiary,
+    ${netsuite.ns_int("year")} AS fiscal_year,
+    category,
+    month,
+    amount,
+    ingestion_date,
+    ingestion_timestamp
+  FROM latest
+  UNPIVOT (
+    amount FOR month IN (
+      amount_1 AS 1, amount_2 AS 2, amount_3 AS 3, amount_4 AS 4,
+      amount_5 AS 5, amount_6 AS 6, amount_7 AS 7, amount_8 AS 8,
+      amount_9 AS 9, amount_10 AS 10, amount_11 AS 11, amount_12 AS 12
+    )
+  )
+)
+
+SELECT
+  budget_id,
+  account,
+  department,
+  subsidiary,
+  fiscal_year,
+  category,
+  month,
+  DATE(fiscal_year, month, 1) AS period_start,
+  ${netsuite.ns_numeric("amount")} AS budget_amount,
+  ingestion_date,
+  ingestion_timestamp,
+  ${netsuite.audit_columns()}
+FROM unpivoted
+WHERE amount IS NOT NULL

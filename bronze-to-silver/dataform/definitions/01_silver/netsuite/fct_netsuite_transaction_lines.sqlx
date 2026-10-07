@@ -1,0 +1,64 @@
+config {
+  type: "table",
+  database: dataform.projectConfig.vars.udp_project,
+  schema: dataform.projectConfig.vars.silver_dataset,
+  name: "fct_netsuite_transaction_lines",
+  description: "Posting transaction detail lines (mainline = 'F') joined to the latest posting = 'T' transaction header.",
+  tags: ["netsuite", "silver", "fct_netsuite_transaction_lines"],
+  bigquery: {
+    partitionBy: "trandate",
+    clusterBy: ["account"]
+  },
+  columns: {
+    line_id: "transactionline.id (business key, STRING)",
+    transaction_id: "transactionline.transaction -> transaction.id",
+    _silver_loaded_at: "Run time of the silver load",
+    _silver_run_id: "dataform:<run_id var>"
+  },
+  assertions: {
+    uniqueKey: ["line_id"],
+    nonNull: ["line_id", "transaction_id", "trandate"]
+  }
+}
+
+WITH lines AS (
+  ${netsuite.latest_version(ref(dataform.projectConfig.vars.bronze_dataset, "netsuite_transactionline"), "id", "linelastmodifieddate")}
+),
+
+txn AS (
+  SELECT id, tranid, type, trandate, currency, postingperiod
+  FROM ${ref("stg_netsuite_transaction")}
+  WHERE posting = TRUE
+)
+
+SELECT
+  l.id AS line_id,
+  l.transaction AS transaction_id,
+  l.uniquekey,
+  ${netsuite.ns_int("l.linesequencenumber")} AS linesequencenumber,
+  t.tranid,
+  t.type,
+  t.trandate,
+  t.postingperiod,
+  t.currency,
+  l.account,
+  l.department,
+  l.class,
+  l.location,
+  l.subsidiary,
+  l.item,
+  ${netsuite.ns_int("l.quantity")} AS quantity,
+  ${netsuite.ns_numeric("l.rate")} AS rate,
+  ${netsuite.ns_numeric("l.netamount")} AS netamount,
+  ${netsuite.ns_numeric("l.foreignamount")} AS foreignamount,
+  l.memo,
+  ${netsuite.tf_to_bool("l.mainline")} AS mainline,
+  ${netsuite.tf_to_bool("l.taxline")} AS taxline,
+  ${netsuite.ns_timestamp("l.linelastmodifieddate")} AS linelastmodifieddate,
+  l.ingestion_date,
+  l.ingestion_timestamp,
+  ${netsuite.audit_columns()}
+FROM lines AS l
+JOIN txn AS t
+  ON l.transaction = t.id
+WHERE l.mainline = 'F'
